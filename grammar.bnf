@@ -1,0 +1,223 @@
+// -----------------------------------------
+// Lexical grammar
+
+%lex
+
+%%
+
+\/\/.*              /* skip comments */
+\/\*(.|\s)*\*\/     /* skip block comments */        
+
+\s+                 /* skip whitespace */
+
+
+// -----------------------------------------
+// Keywords
+
+\bfn\b              return 'FN'
+\breturn\b          return 'RETURN'
+\bif\b              return 'IF'
+\belse\b            return 'ELSE'
+
+\d+                 return 'NUMBER'
+\w+                 return 'IDENTIFIER'
+
+[+\-]               return 'ADDITIVE_OPERATOR'
+[*/]                return 'MULTIPLICATIVE_OPERATOR'
+
+/lex
+
+// -----------------------------------------
+// Module Include
+
+%{
+
+function BinaryExpression(left, op, right) {
+  return {
+    type: 'BinaryExpression',
+    op,
+    left,
+    right,
+  };
+}
+
+%}
+
+
+// -----------------------------------------
+// Syntactic grammar
+
+%%
+
+Program
+  : StatementList
+    {
+      $$ = {
+        type: 'Program',
+        body: $1,
+      };
+    }
+  ;
+
+StatementList
+  : Statement
+    {
+      $$ = [$1];
+    }
+  | StatementList Statement
+    {
+      $1.push($2);
+      $$ = $1;
+    }
+  ;
+
+OptStatementList
+  : StatementList
+  | /* empty */
+    { $$ = []; }
+  ;
+
+Statement
+  : ExpressionStatement
+  | EmptyStatement
+  | BlockStatement
+  | FunctionDeclaration
+  | ReturnStatement
+  | IfStatement
+  ;
+
+IfStatement
+  : IF '(' Expression ')' Statement 
+  | IF '(' Expression ')' Statement ELSE Statement
+  ;
+
+ReturnStatement
+  : RETURN OptExpression ';' 
+    {
+      $$ = {
+        type: 'ReturnStatement',
+        argument: $2,
+      };
+    }
+  ;
+
+OptExpression
+  : Expression
+  | /* Empty */
+    { $$ = null; }
+  ;
+
+FunctionDeclaration
+  : FN Identifier '(' OptFormalParameterList ')' BlockStatement
+    {
+      $$ = {
+        type: 'FunctionDeclaration',
+        name: $Identifier,
+        params: $4,
+        body: $6
+      };
+    }
+  ;
+
+Identifier
+  : IDENTIFIER
+    {
+      $$ = {
+        type: 'Identifier',
+        value: $1,
+      };
+    }
+  ;
+
+OptFormalParameterList
+  : FormalParameterList
+  | /* Empty */
+    {
+      $$ = [];
+    }
+  ;
+
+FormalParameterList
+  : Identifier 
+    {
+      $$ = [$1];
+    }
+  | FormalParameterList ',' Identifier 
+    {
+      $1.push($3);
+      return $1;
+    }
+  ;
+
+ExpressionStatement
+  : Expression ';'
+    {
+      $$ = {
+        type: 'ExpressionStatement',
+        expression: $1,
+      };
+    }
+  ;
+
+EmptyStatement
+  : ';' 
+    {
+      $$ = {
+        type: 'EmptyStatement',
+      };
+    }
+  ;
+
+BlockStatement
+  : '{' OptStatementList '}' 
+    {
+      $$ = {
+        type: 'BlockStatement',
+        body: $2,
+      };
+    }
+  ;
+
+Expression
+  : AdditiveExpression
+  ;
+
+AdditiveExpression
+  : AdditiveExpression ADDITIVE_OPERATOR MultiplicativeExpression
+    {
+      $$ = BinaryExpression($1, $2, $3) 
+    }
+  | MultiplicativeExpression
+  ;
+
+MultiplicativeExpression
+  : MultiplicativeExpression MULTIPLICATIVE_OPERATOR PrimaryExpression 
+    {
+      $$ = BinaryExpression($1, $2, $3) 
+    }
+  | PrimaryExpression
+  ;
+
+PrimaryExpression
+  : Literal 
+  | Identifier
+  | ParenthesizedExpression
+  ;
+
+Literal
+  : NumericLiteral 
+  ;
+
+NumericLiteral
+  : NUMBER 
+    {
+      $$ = {
+        type: 'NumericLiteral',
+        value: Number($1)
+      }
+    }
+  ;
+
+ParenthesizedExpression
+  : '(' Expression ')' { $$ = $2; }
+  ;
