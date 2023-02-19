@@ -18,9 +18,15 @@
 \breturn\b          return 'RETURN'
 \bif\b              return 'IF'
 \belse\b            return 'ELSE'
+\btrue\b            return 'TRUE'
+\bfalse\b           return 'FALSE'
+\bnull\b            return 'NULL'
 
 \d+                 return 'NUMBER'
 \w+                 return 'IDENTIFIER'
+
+[\=!]\=             return 'EQUALITY_OPERATOR'
+[><]\=?             return 'RELATIONAL_OPERATOR'
 
 [+\-]               return 'ADDITIVE_OPERATOR'
 [*/]                return 'MULTIPLICATIVE_OPERATOR'
@@ -35,14 +41,35 @@
 function BinaryExpression(left, op, right) {
   return {
     type: 'BinaryExpression',
-    op,
+    operator: op,
     left,
     right,
   };
 }
 
+function Literal(prefix, value) {
+  return {
+    type: prefix + 'Literal',
+    value
+  }
+}
+
+function IfStatement(test, consequent, alternate) {
+  return {
+    type: 'IfStatement',
+    test,
+    consequent,
+    alternate
+  }
+}
+
 %}
 
+/**
+ * The `THEN` precedence is lower than that of `ELSE`, so no shift-reduce conflict, and no dangling-else
+ */
+%nonassoc THEN
+%nonassoc ELSE
 
 // -----------------------------------------
 // Syntactic grammar
@@ -87,8 +114,10 @@ Statement
   ;
 
 IfStatement
-  : IF '(' Expression ')' Statement 
+  : IF '(' Expression ')' Statement %prec THEN
+    { $$ = IfStatement($3, $5); }
   | IF '(' Expression ')' Statement ELSE Statement
+    { $$ = IfStatement($3, $5, $7); }
   ;
 
 ReturnStatement
@@ -179,7 +208,23 @@ BlockStatement
   ;
 
 Expression
+  : EqualityExpression
+  ;
+
+EqualityExpression
+  : RelationalExpression
+  | EqualityExpression EQUALITY_OPERATOR RelationalExpression
+    {
+      $$ = BinaryExpression($1, $2, $3) 
+    }
+  ;
+
+RelationalExpression
   : AdditiveExpression
+  | RelationalExpression RELATIONAL_OPERATOR AdditiveExpression
+    {
+      $$ = BinaryExpression($1, $2, $3) 
+    }
   ;
 
 AdditiveExpression
@@ -206,16 +251,25 @@ PrimaryExpression
 
 Literal
   : NumericLiteral 
+  | TrueLiteral
+  | FalseLiteral
+  | NullLiteral
+  ;
+
+TrueLiteral
+  : TRUE { $$ = Literal('Boolean', true); }
+  ;
+
+FalseLiteral
+  : FALSE { $$ = Literal('Boolean', false); }
+  ;
+
+NullLiteral
+  : NULL { $$ = Literal('Null', null); }
   ;
 
 NumericLiteral
-  : NUMBER 
-    {
-      $$ = {
-        type: 'NumericLiteral',
-        value: Number($1)
-      }
-    }
+  : NUMBER { $$ = Literal('Numeric', Number($1)); }
   ;
 
 ParenthesizedExpression
