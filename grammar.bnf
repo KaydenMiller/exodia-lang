@@ -25,8 +25,26 @@
 \d+                 return 'NUMBER'
 \w+                 return 'IDENTIFIER'
 
+// -----------------------------------------
+// Logical Operators: &&, ||
+
+\|\|                return 'LOGICAL_OR'
+\&\&                return 'LOGICAL_AND'
+
+// -----------------------------------------
+// Equality Operators: ==, !=
 [\=!]\=             return 'EQUALITY_OPERATOR'
+
+// -----------------------------------------
+// Relational Operators: >, >=, <, <=
+
 [><]\=?             return 'RELATIONAL_OPERATOR'
+
+// -----------------------------------------
+// Assignment Operators: =, *=, /=, +=, -=
+
+\=                   return 'SIMPLE_ASSIGN'
+[*/+\-]\=            return 'COMPLEX_ASSIGN'
 
 [+\-]               return 'ADDITIVE_OPERATOR'
 [*/]                return 'MULTIPLICATIVE_OPERATOR'
@@ -45,6 +63,15 @@ function BinaryExpression(left, op, right) {
     left,
     right,
   };
+}
+
+function LogicalExpression(left, op, right) {
+  return {
+    type: 'LogicalExpression',
+    operator: op,
+    left,
+    right
+  }
 }
 
 function Literal(prefix, value) {
@@ -208,7 +235,41 @@ BlockStatement
   ;
 
 Expression
+  : AssignmentExpression 
+  ;
+
+AssignmentExpression
+  : LogicalORExpression 
+  | LeftHandSideExpression AssignmentOperator AssignmentExpression
+    {
+      $$ = {
+        type: 'AssignmentExpression',
+        left: $1,
+        operator: $2,
+        right: $3
+      };
+    }
+  ;
+
+LeftHandSideExpression
+  : Identifier
+  ;
+
+AssignmentOperator
+  : SIMPLE_ASSIGN
+  | COMPLEX_ASSIGN
+  ;
+
+LogicalORExpression
+  : LogicalANDExpression
+  | LogicalORExpression LOGICAL_OR LogicalANDExpression
+    { $$ = LogicalExpression($1, $2, $3); }
+  ;
+
+LogicalANDExpression
   : EqualityExpression
+  | LogicalANDExpression LOGICAL_AND EqualityExpression
+    { $$ = LogicalExpression($1, $2, $3); }
   ;
 
 EqualityExpression
