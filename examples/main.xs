@@ -1,7 +1,17 @@
-let a = 10;
+fn getMagic() {
+    return -11;
+}
 
-let a;
-let c, b;
-let d = 10, e = 20;
-let f, g = 10;
-let h = 10, i;
+-getMagic();
+
+fn getCallback() {
+    fn inner() {
+        return 9;
+    }
+
+    return inner;
+}
+
+-getCallback()();
+
++20 * -getMagic();

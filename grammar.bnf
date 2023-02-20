@@ -91,6 +91,14 @@ function IfStatement(test, consequent, alternate) {
   }
 }
 
+function UnaryExpression(operator, argument) {
+  return {
+    type: 'UnaryExpression',
+    operator,
+    argument
+  }
+}
+
 %}
 
 /**
@@ -338,11 +346,52 @@ AdditiveExpression
   ;
 
 MultiplicativeExpression
-  : MultiplicativeExpression MULTIPLICATIVE_OPERATOR PrimaryExpression 
+  : MultiplicativeExpression MULTIPLICATIVE_OPERATOR UnaryExpression 
     {
       $$ = BinaryExpression($1, $2, $3) 
     }
-  | PrimaryExpression
+  | UnaryExpression 
+  ;
+
+UnaryExpression
+  : PrimaryExpression
+  | CallExpression
+  | ADDITIVE_OPERATOR UnaryExpression
+    { $$ = UnaryExpression($1, $2); }
+  ;
+
+CallExpression
+  : Callee Arguments
+    {
+      $$ = {
+        type: 'CallExpression',
+        callee: $1,
+        arguments: $2
+      };
+    }
+  ;
+
+Callee
+  : LeftHandSideExpression
+  | CallExpression
+  ;
+
+Arguments
+  : '(' OptArgumentList ')'
+    { $$ = $2; }
+  ;
+
+OptArgumentList
+  : ArgumentList
+  | /* empty */
+    { $$ = []; }
+  ;
+
+ArgumentList
+  : AssignmentExpression
+    { $$ = [$1]; }
+  | ArgumentList ',' AssignmentExpression 
+    { $1.push($3); $$ = $1; }
   ;
 
 PrimaryExpression
