@@ -12,6 +12,13 @@
 
 
 // -----------------------------------------
+// String
+
+\"[^\"]*\"          return 'STRING'
+
+// " this is just used to remove the bad highlighting with vscode
+
+// -----------------------------------------
 // Keywords
 
 \bfn\b              return 'FN'
@@ -405,6 +412,7 @@ Literal
   | TrueLiteral
   | FalseLiteral
   | NullLiteral
+  | StringLiteral
   ;
 
 TrueLiteral
@@ -421,6 +429,10 @@ NullLiteral
 
 NumericLiteral
   : NUMBER { $$ = Literal('Numeric', Number($1)); }
+  ;
+
+StringLiteral
+  : STRING { $$ = Literal('String', $1.slice(1, -1)); }
   ;
 
 ParenthesizedExpression
