@@ -280,14 +280,9 @@ OptFormalParameterList
 
 FormalParameterList
   : Identifier 
-    {
-      $$ = [$1];
-    }
+    { $$ = [$1]; }
   | FormalParameterList ',' Identifier 
-    {
-      $1.push($3);
-      return $1;
-    }
+    { $1.push($3); $$ = $1; }
   ;
 
 ExpressionStatement
