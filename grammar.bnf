@@ -33,6 +33,12 @@
 \bdo\b              return 'DO'
 \bfor\b             return 'FOR'
 
+\bclass\b           return 'CLASS'
+\bthis\b            return 'THIS'
+\bsuper\b           return 'SUPER'
+\bnew\b             return 'NEW'
+\bextends\b         return 'EXTENDS'
+
 \d+                 return 'NUMBER'
 \w+                 return 'IDENTIFIER'
 
@@ -117,6 +123,14 @@ function MemberExpression(object, property) {
   }
 }
 
+function CallExpression(callee, arguments) {
+  return {
+    type: 'CallExpression',
+    callee,
+    arguments
+  }
+}
+
 %}
 
 /**
@@ -167,6 +181,30 @@ Statement
   | IfStatement
   | VariableStatement
   | IterationStatement
+  | ClassDeclaration
+  ;
+
+ClassDeclaration
+  : CLASS Identifier OptClassExtends Statement
+    { 
+      $$ = {
+        type: 'ClassDeclaration',
+        id: $2,
+        superClass: $3,
+        body: $4
+      }
+    }
+  ;
+
+OptClassExtends
+  : ClassExtends
+  | /* empty */
+    { $$ = null; }
+  ;
+
+ClassExtends
+  : EXTENDS Identifier
+    { $$ = $2; }
   ;
 
 IterationStatement
@@ -209,8 +247,7 @@ VariableDeclaration
       $$ = {
         type: 'VariableDeclaration',
         id: $1,
-        // the null here feels a bit off its not in the lecture
-        initializer: $2 ?? null
+        initializer: $2
       }
     }
   ;
@@ -218,6 +255,7 @@ VariableDeclaration
 OptVariableInitializer
   : VariableInitializer
   | /* empty */
+    { $$ = null; }
   ;
 
 VariableInitializer
@@ -347,10 +385,20 @@ LeftHandSideExpression
 
 MemberExpression
   : Identifier
+  | ThisExpression
   | MemberExpression '.' Identifier
     { $$ = MemberExpression($1, $3); }
   | MemberExpression '[' Expression ']'
     { $$ = MemberExpression($1, $3); }
+  ;
+
+ThisExpression
+  : THIS
+    { 
+      $$ = {
+        type: 'ThisExpression'
+      }
+    }
   ;
 
 AssignmentOperator
@@ -411,12 +459,17 @@ UnaryExpression
 
 CallExpression
   : Callee Arguments
+    { $$ = CallExpression($1, $2); }
+  | Super Arguments
+    { $$ = CallExpression($1, $2); }
+  ;
+
+Super
+  : SUPER
     {
       $$ = {
-        type: 'CallExpression',
-        callee: $1,
-        arguments: $2
-      };
+        type: 'Super'
+      }
     }
   ;
 
@@ -445,8 +498,20 @@ ArgumentList
 
 PrimaryExpression
   : Literal 
+  | NewExpression
   | MemberExpression
   | ParenthesizedExpression
+  ;
+
+NewExpression
+  : NEW MemberExpression Arguments
+    {
+      $$ = {
+        type: 'NewExpression',
+        callee: $2,
+        arguments: $3
+      }
+    }
   ;
 
 Literal
