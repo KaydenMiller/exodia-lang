@@ -21,6 +21,7 @@
 \btrue\b            return 'TRUE'
 \bfalse\b           return 'FALSE'
 \bnull\b            return 'NULL'
+\blet\b             return 'LET'
 
 \d+                 return 'NUMBER'
 \w+                 return 'IDENTIFIER'
@@ -138,6 +139,46 @@ Statement
   | FunctionDeclaration
   | ReturnStatement
   | IfStatement
+  | VariableStatement
+  ;
+
+VariableStatement
+  : LET VariableDeclarationList ';'
+    {
+      $$ = {
+        type: 'VariableStatement',
+        declarations: $2
+      }
+    }
+  ;
+
+VariableDeclarationList
+  : VariableDeclaration
+    { $$ = [$1]; }
+  | VariableDeclarationList ',' VariableDeclaration
+    { $1.push($3); $$ = $1; }
+  ;
+
+VariableDeclaration
+  : Identifier OptVariableInitializer
+    {
+      $$ = {
+        type: 'VariableDeclaration',
+        id: $1,
+        // the null here feels a bit off its not in the lecture
+        initializer: $2 ?? null
+      }
+    }
+  ;
+
+OptVariableInitializer
+  : VariableInitializer
+  | /* empty */
+  ;
+
+VariableInitializer
+  : SIMPLE_ASSIGN AssignmentExpression
+    { $$ = $2; }
   ;
 
 IfStatement

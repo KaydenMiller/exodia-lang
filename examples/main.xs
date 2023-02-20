@@ -1,5 +1,7 @@
-if (a == 10 && b == 20) {
-    a = 20;
-}
+let a = 10;
 
-a = b = 50;
+let a;
+let c, b;
+let d = 10, e = 20;
+let f, g = 10;
+let h = 10, i;
