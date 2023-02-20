@@ -209,8 +209,19 @@ ClassExtends
 
 IterationStatement
   : WhileStatement
-  /* TODO: DoWhileStatement */
+  | DoWhileStatement
   /* TODO: ForStatement */
+  ;
+
+DoWhileStatement
+  : DO Statement WHILE '(' Expression ')'
+    {
+      $$ = {
+        type: 'DoWhileStatement',
+        test: $5,
+        body: $2
+      }
+    }
   ;
 
 WhileStatement
