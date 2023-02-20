@@ -29,6 +29,9 @@
 \bfalse\b           return 'FALSE'
 \bnull\b            return 'NULL'
 \blet\b             return 'LET'
+\bwhile\b           return 'WHILE'
+\bdo\b              return 'DO'
+\bfor\b             return 'FOR'
 
 \d+                 return 'NUMBER'
 \w+                 return 'IDENTIFIER'
@@ -155,6 +158,24 @@ Statement
   | ReturnStatement
   | IfStatement
   | VariableStatement
+  | IterationStatement
+  ;
+
+IterationStatement
+  : WhileStatement
+  /* TODO: DoWhileStatement */
+  /* TODO: ForStatement */
+  ;
+
+WhileStatement
+  : WHILE '(' Expression ')' Statement
+    {
+      $$ = {
+        type: 'WhileStatement',
+        test: $3,
+        body: $5
+      }
+    }
   ;
 
 VariableStatement
