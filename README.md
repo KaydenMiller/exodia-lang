@@ -41,7 +41,7 @@ none | null
 Optional<int>
 ```
 
-## Classes 
+## Classes
 ```csharp
 namespace MyNamespace;
 

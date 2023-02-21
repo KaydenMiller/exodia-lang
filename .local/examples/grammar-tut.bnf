@@ -1,0 +1,571 @@
+﻿// -----------------------------------------
+// Lexical grammar
+
+%lex
+
+%%
+
+\/\/.*              /* skip comments */
+\/\*[\s\S]*?\*\/    /* skip block comments - more correct than the last */
+
+\s+                 /* skip whitespace */
+
+
+// -----------------------------------------
+// String
+
+\"[^\"]*\"          return 'STRING'
+
+// " this is just used to remove the bad highlighting with vscode
+
+// -----------------------------------------
+// Keywords
+
+\bfn\b              return 'FN'
+\breturn\b          return 'RETURN'
+\bif\b              return 'IF'
+\belse\b            return 'ELSE'
+\btrue\b            return 'TRUE'
+\bfalse\b           return 'FALSE'
+\bnull\b            return 'NULL'
+\blet\b             return 'LET'
+\bwhile\b           return 'WHILE'
+\bdo\b              return 'DO'
+\bfor\b             return 'FOR'
+
+\bclass\b           return 'CLASS'
+\bthis\b            return 'THIS'
+\bsuper\b           return 'SUPER'
+\bnew\b             return 'NEW'
+\bextends\b         return 'EXTENDS'
+
+\d+                 return 'NUMBER'
+\w+                 return 'IDENTIFIER'
+
+// -----------------------------------------
+// Logical Operators: &&, ||
+
+\|\|                return 'LOGICAL_OR'
+\&\&                return 'LOGICAL_AND'
+
+// -----------------------------------------
+// Equality Operators: ==, !=
+[\=!]\=             return 'EQUALITY_OPERATOR'
+
+// -----------------------------------------
+// Relational Operators: >, >=, <, <=
+
+[><]\=?             return 'RELATIONAL_OPERATOR'
+
+// -----------------------------------------
+// Assignment Operators: =, *=, /=, +=, -=
+
+\=                   return 'SIMPLE_ASSIGN'
+[*/+\-]\=            return 'COMPLEX_ASSIGN'
+
+[+\-]               return 'ADDITIVE_OPERATOR'
+[*/]                return 'MULTIPLICATIVE_OPERATOR'
+
+/lex
+
+// -----------------------------------------
+// Module Include
+
+%{
+
+function BinaryExpression(left, op, right) {
+  return {
+    type: 'BinaryExpression',
+    operator: op,
+    left,
+    right,
+  };
+}
+
+function LogicalExpression(left, op, right) {
+  return {
+    type: 'LogicalExpression',
+    operator: op,
+    left,
+    right
+  }
+}
+
+function Literal(prefix, value) {
+  return {
+    type: prefix + 'Literal',
+    value
+  }
+}
+
+function IfStatement(test, consequent, alternate) {
+  return {
+    type: 'IfStatement',
+    test,
+    consequent,
+    alternate
+  }
+}
+
+function UnaryExpression(operator, argument) {
+  return {
+    type: 'UnaryExpression',
+    operator,
+    argument
+  }
+}
+
+function MemberExpression(object, property) {
+  return {
+    type: 'MemberExpression',
+    object,
+    property
+  }
+}
+
+function CallExpression(callee, arguments) {
+  return {
+    type: 'CallExpression',
+    callee,
+    arguments
+  }
+}
+
+%}
+
+/**
+ * The `THEN` precedence is lower than that of `ELSE`, so no shift-reduce conflict, and no dangling-else
+ */
+%nonassoc THEN
+%nonassoc ELSE
+
+// -----------------------------------------
+// Syntactic grammar
+
+%%
+
+Program
+  : StatementList
+    {
+      $$ = {
+        type: 'Program',
+        body: $1,
+      };
+    }
+  ;
+
+StatementList
+  : Statement
+    {
+      $$ = [$1];
+    }
+  | StatementList Statement
+    {
+      $1.push($2);
+      $$ = $1;
+    }
+  ;
+
+OptStatementList
+  : StatementList
+  | /* empty */
+    { $$ = []; }
+  ;
+
+Statement
+  : ExpressionStatement
+  | EmptyStatement
+  | BlockStatement
+  | FunctionDeclaration
+  | ReturnStatement
+  | IfStatement
+  | VariableStatement
+  | IterationStatement
+  | ClassDeclaration
+  ;
+
+ClassDeclaration
+  : CLASS Identifier OptClassExtends Statement
+    { 
+      $$ = {
+        type: 'ClassDeclaration',
+        id: $2,
+        superClass: $3,
+        body: $4
+      }
+    }
+  ;
+
+OptClassExtends
+  : ClassExtends
+  | /* empty */
+    { $$ = null; }
+  ;
+
+ClassExtends
+  : EXTENDS Identifier
+    { $$ = $2; }
+  ;
+
+IterationStatement
+  : WhileStatement
+  | DoWhileStatement
+  | ForStatement
+  ;
+
+ForStatement
+  : FOR '(' VariableStatement Expression ';' Expression ')' Statement
+    {
+      $$ = {
+        type: 'ForStatement',
+        declaration: $3,
+        test: $4, 
+        increment: $6,
+        body: $8
+      }
+    }
+  ;
+
+DoWhileStatement
+  : DO Statement WHILE '(' Expression ')'
+    {
+      $$ = {
+        type: 'DoWhileStatement',
+        test: $5,
+        body: $2
+      }
+    }
+  ;
+
+WhileStatement
+  : WHILE '(' Expression ')' Statement
+    {
+      $$ = {
+        type: 'WhileStatement',
+        test: $3,
+        body: $5
+      }
+    }
+  ;
+
+VariableStatement
+  : LET VariableDeclarationList ';'
+    {
+      $$ = {
+        type: 'VariableStatement',
+        declarations: $2
+      }
+    }
+  ;
+
+VariableDeclarationList
+  : VariableDeclaration
+    { $$ = [$1]; }
+  | VariableDeclarationList ',' VariableDeclaration
+    { $1.push($3); $$ = $1; }
+  ;
+
+VariableDeclaration
+  : Identifier OptVariableInitializer
+    {
+      $$ = {
+        type: 'VariableDeclaration',
+        id: $1,
+        initializer: $2
+      }
+    }
+  ;
+
+OptVariableInitializer
+  : VariableInitializer
+  | /* empty */
+    { $$ = null; }
+  ;
+
+VariableInitializer
+  : SIMPLE_ASSIGN AssignmentExpression
+    { $$ = $2; }
+  ;
+
+IfStatement
+  : IF '(' Expression ')' Statement %prec THEN
+    { $$ = IfStatement($3, $5); }
+  | IF '(' Expression ')' Statement ELSE Statement
+    { $$ = IfStatement($3, $5, $7); }
+  ;
+
+ReturnStatement
+  : RETURN OptExpression ';' 
+    {
+      $$ = {
+        type: 'ReturnStatement',
+        argument: $2,
+      };
+    }
+  ;
+
+OptExpression
+  : Expression
+  | /* Empty */
+    { $$ = null; }
+  ;
+
+FunctionDeclaration
+  : FN Identifier '(' OptFormalParameterList ')' BlockStatement
+    {
+      $$ = {
+        type: 'FunctionDeclaration',
+        name: $Identifier,
+        params: $4,
+        body: $6
+      };
+    }
+  ;
+
+Identifier
+  : IDENTIFIER
+    {
+      $$ = {
+        type: 'Identifier',
+        value: $1,
+      };
+    }
+  ;
+
+OptFormalParameterList
+  : FormalParameterList
+  | /* Empty */
+    {
+      $$ = [];
+    }
+  ;
+
+FormalParameterList
+  : Identifier 
+    { $$ = [$1]; }
+  | FormalParameterList ',' Identifier 
+    { $1.push($3); $$ = $1; }
+  ;
+
+ExpressionStatement
+  : Expression ';'
+    {
+      $$ = {
+        type: 'ExpressionStatement',
+        expression: $1,
+      };
+    }
+  ;
+
+EmptyStatement
+  : ';' 
+    {
+      $$ = {
+        type: 'EmptyStatement',
+      };
+    }
+  ;
+
+BlockStatement
+  : '{' OptStatementList '}' 
+    {
+      $$ = {
+        type: 'BlockStatement',
+        body: $2,
+      };
+    }
+  ;
+
+Expression
+  : AssignmentExpression 
+  ;
+
+AssignmentExpression
+  : LogicalORExpression 
+  | LeftHandSideExpression AssignmentOperator AssignmentExpression
+    {
+      $$ = {
+        type: 'AssignmentExpression',
+        left: $1,
+        operator: $2,
+        right: $3
+      };
+    }
+  ;
+
+/**
+
+Left-hand side expression
+
+foo = 10;
+foo['bar'] = 10;
+foo[0] = 10;
+foo.bar = 20;
+foo.bar.baz;
+*/
+LeftHandSideExpression
+  : MemberExpression
+  ;
+
+MemberExpression
+  : Identifier
+  | ThisExpression
+  | MemberExpression '.' Identifier
+    { $$ = MemberExpression($1, $3); }
+  | MemberExpression '[' Expression ']'
+    { $$ = MemberExpression($1, $3); }
+  ;
+
+ThisExpression
+  : THIS
+    { 
+      $$ = {
+        type: 'ThisExpression'
+      }
+    }
+  ;
+
+AssignmentOperator
+  : SIMPLE_ASSIGN
+  | COMPLEX_ASSIGN
+  ;
+
+LogicalORExpression
+  : LogicalANDExpression
+  | LogicalORExpression LOGICAL_OR LogicalANDExpression
+    { $$ = LogicalExpression($1, $2, $3); }
+  ;
+
+LogicalANDExpression
+  : EqualityExpression
+  | LogicalANDExpression LOGICAL_AND EqualityExpression
+    { $$ = LogicalExpression($1, $2, $3); }
+  ;
+
+EqualityExpression
+  : RelationalExpression
+  | EqualityExpression EQUALITY_OPERATOR RelationalExpression
+    {
+      $$ = BinaryExpression($1, $2, $3) 
+    }
+  ;
+
+RelationalExpression
+  : AdditiveExpression
+  | RelationalExpression RELATIONAL_OPERATOR AdditiveExpression
+    {
+      $$ = BinaryExpression($1, $2, $3) 
+    }
+  ;
+
+AdditiveExpression
+  : AdditiveExpression ADDITIVE_OPERATOR MultiplicativeExpression
+    {
+      $$ = BinaryExpression($1, $2, $3) 
+    }
+  | MultiplicativeExpression
+  ;
+
+MultiplicativeExpression
+  : MultiplicativeExpression MULTIPLICATIVE_OPERATOR UnaryExpression 
+    {
+      $$ = BinaryExpression($1, $2, $3) 
+    }
+  | UnaryExpression 
+  ;
+
+UnaryExpression
+  : PrimaryExpression
+  | CallExpression
+  | ADDITIVE_OPERATOR UnaryExpression
+    { $$ = UnaryExpression($1, $2); }
+  ;
+
+CallExpression
+  : Callee Arguments
+    { $$ = CallExpression($1, $2); }
+  | Super Arguments
+    { $$ = CallExpression($1, $2); }
+  ;
+
+Super
+  : SUPER
+    {
+      $$ = {
+        type: 'Super'
+      }
+    }
+  ;
+
+Callee
+  : LeftHandSideExpression
+  | CallExpression
+  ;
+
+Arguments
+  : '(' OptArgumentList ')'
+    { $$ = $2; }
+  ;
+
+OptArgumentList
+  : ArgumentList
+  | /* empty */
+    { $$ = []; }
+  ;
+
+ArgumentList
+  : AssignmentExpression
+    { $$ = [$1]; }
+  | ArgumentList ',' AssignmentExpression 
+    { $1.push($3); $$ = $1; }
+  ;
+
+PrimaryExpression
+  : Literal 
+  | NewExpression
+  | MemberExpression
+  | ParenthesizedExpression
+  ;
+
+NewExpression
+  : NEW MemberExpression Arguments
+    {
+      $$ = {
+        type: 'NewExpression',
+        callee: $2,
+        arguments: $3
+      }
+    }
+  ;
+
+Literal
+  : NumericLiteral 
+  | TrueLiteral
+  | FalseLiteral
+  | NullLiteral
+  | StringLiteral
+  ;
+
+TrueLiteral
+  : TRUE { $$ = Literal('Boolean', true); }
+  ;
+
+FalseLiteral
+  : FALSE { $$ = Literal('Boolean', false); }
+  ;
+
+NullLiteral
+  : NULL { $$ = Literal('Null', null); }
+  ;
+
+NumericLiteral
+  : NUMBER { $$ = Literal('Numeric', Number($1)); }
+  ;
+
+StringLiteral
+  : STRING { $$ = Literal('String', $1.slice(1, -1)); }
+  ;
+
+ParenthesizedExpression
+  : '(' Expression ')' { $$ = $2; }
+  ;
