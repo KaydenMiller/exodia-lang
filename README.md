@@ -1,5 +1,21 @@
 ﻿# EXODIA
 
+# Useful tools
+https://astexplorer.net/
+https://godbolt.org/
+https://sharplab.io/
+
+# Design Goals
+
+* First-class Functions: assign to variable, pass as arguments, return as values
+* Elegant yet explicit, no magic
+* function
+* namespacing
+* oop + functional + imperative 
+* lambda functions using traditional arrow syntax
+* statically typed
+
+
 # Definitions
 ## Variable Declaration
 ```csharp
