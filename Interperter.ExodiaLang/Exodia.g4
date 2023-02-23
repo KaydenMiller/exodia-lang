@@ -1,4 +1,4 @@
-﻿grammar ExodiaParser;
+﻿grammar Exodia;
 
 // LEXER
 
@@ -193,7 +193,7 @@ relational_expression
     
 additive_expression
     : multiplicative_expression 
-    | additive_expression ADDITIVE_OPERATOR multiplicative_expression 
+    | additive_expression ADDITIVE_OPERATOR multiplicative_expression
     ;
     
 multiplicative_expression
