@@ -16,6 +16,7 @@
 
     <ItemGroup>
         <PackageReference Include="Antlr4.Runtime.Standard" Version="4.11.1" />
+        <PackageReference Include="LLVMSharp" Version="5.0.0" />
     </ItemGroup>
 
     <ItemGroup>

@@ -1,4 +1,6 @@
-﻿namespace Interperter.ExodiaLang;
+﻿using LLVMSharp;
+
+namespace Interperter.ExodiaLang;
 
 public class EvalExodiaVisitor : ExodiaBaseVisitor<int>
 {
@@ -81,6 +83,7 @@ public class EvalExodiaVisitor : ExodiaBaseVisitor<int>
     public override int VisitNumeric_literal(ExodiaParser.Numeric_literalContext context)
     {
         var value = int.Parse(context.INT().GetText());
+        
         _stack.Push(value);
         return value;
     }

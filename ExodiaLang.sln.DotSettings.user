@@ -1,7 +1,4 @@
 ﻿<wpf:ResourceDictionary xml:space="preserve" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib" xmlns:ss="urn:shemas-jetbrains-com:settings-storage-xaml" xmlns:wpf="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
 	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=090da6cd_002Dccdf_002D4cf6_002Da413_002D607abad48fab/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="Test1" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
-  &lt;TestAncestor&gt;&#xD;
-    &lt;TestId&gt;xUnit::777CFA2A-6AC3-489C-AA8A-94D8BAF3E967::net7.0::Interpreter.Test.Unit.Literals.GivenNumber_WhenValidInt_ShouldCreateIntLiteral&lt;/TestId&gt;&#xD;
-    &lt;TestId&gt;xUnit::777CFA2A-6AC3-489C-AA8A-94D8BAF3E967::net7.0::Interpreter.Test.Unit.AdditiveExpressions.GivenValidInput_WhenAddExpression_ShouldResolveToCorrectValue&lt;/TestId&gt;&#xD;
-  &lt;/TestAncestor&gt;&#xD;
+  &lt;Project Location="D:\workspaces\compilers\cspg\Grammer.ParserGenerator\Interpreter.Test.Unit" Presentation="&amp;lt;Interpreter.Test.Unit&amp;gt;" /&gt;&#xD;
 &lt;/SessionState&gt;</s:String></wpf:ResourceDictionary>

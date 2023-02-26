@@ -6,10 +6,10 @@ namespace Interpreter.Test.Unit;
 public class AdditiveExpressions
 {
     [Theory]
-    [InlineData("1 + 2;", 3)]
-    [InlineData("5 + 5;", 10)]
-    [InlineData("100 + 5;", 105)]
-    [InlineData("100 - 5;", 95)]
+    [InlineData("1 + 2", 3)]
+    [InlineData("5 + 5", 10)]
+    [InlineData("100 + 5", 105)]
+    [InlineData("100 - 5", 95)]
     public void GivenValidInput_WhenAddExpression_ShouldResolveToCorrectValue(string value, int expected)
     {
         // Arrange
