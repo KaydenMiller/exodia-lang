@@ -40,15 +40,10 @@ IDENTIFIER: [a-zA-Z] [a-zA-Z1-9]* ;
 
 // PARSER
     
-program: statement_list? EOF; // THE ? is so you can have an empty file
+program: statement* EOF; // THE ? is so you can have an empty file
 
 // STATEMENTS
 
-statement_list
-    : statement
-    | statement_list statement
-    ;
-    
 statement
     : expression_statement 
     | empty_statement
@@ -118,7 +113,7 @@ return_statement
     ;
     
 block_statement
-    : '{' statement_list? '}'
+    : '{' statement* '}'
     ;
     
 // FUNCTIONS
@@ -173,32 +168,32 @@ identifier
     
 logical_OR_expression
     : logical_AND_expression
-    | logical_OR_expression LOGICAL_OR logical_AND_expression
+    | left=logical_OR_expression op=LOGICAL_OR right=logical_AND_expression
     ;
     
 logical_AND_expression
     : equality_expression
-    | logical_AND_expression LOGICAL_AND equality_expression
+    | left=logical_AND_expression op=LOGICAL_AND right=equality_expression
     ;
     
 equality_expression
     : relational_expression
-    | equality_expression EQUALITY_OPERATOR relational_expression 
+    | left=equality_expression op=EQUALITY_OPERATOR right=relational_expression 
     ;
     
 relational_expression
     : additive_expression
-    | relational_expression RELATIONAL_OPERATOR additive_expression
+    | left=relational_expression op=RELATIONAL_OPERATOR right=additive_expression
     ;
     
 additive_expression
     : multiplicative_expression 
-    | additive_expression ADDITIVE_OPERATOR multiplicative_expression
+    | left=additive_expression op=ADDITIVE_OPERATOR right=multiplicative_expression
     ;
     
 multiplicative_expression
     : unary_expression 
-    | multiplicative_expression MULTIPLICATIVE_OPERATOR unary_expression 
+    | left=multiplicative_expression op=MULTIPLICATIVE_OPERATOR right=unary_expression 
     ;
     
 unary_expression
@@ -208,9 +203,9 @@ unary_expression
     ;
    
 call_expression
-    : callee arguments                      #calleeExpr
-    | super arguments                       #superExpr
-    | call_expression arguments      #nestedCallExpr
+    : callee args=arguments                      
+    | super args=arguments                       
+    | call_expression args=arguments             
     ;
     
 super
@@ -218,7 +213,7 @@ super
     ;
     
 callee
-    : left_hand_side_expression
+    : lhse=left_hand_side_expression
     ;
     
 arguments
@@ -231,7 +226,7 @@ argument_list
     ;
     
 new_expression
-    : NEW member_expression arguments
+    : NEW exp=member_expression args=arguments
     ;
     
 primary_expression
@@ -248,10 +243,10 @@ parenthesized_expression
 // LITERALS
 
 literal
-    : numeric_literal
-    | string_literal
-    | true_literal
-    | false_literal
+    : numeric_literal       #atom
+    | string_literal        #atom
+    | true_literal          #atom
+    | false_literal         #atom
     ;
     
 true_literal
