@@ -3,8 +3,8 @@
 // LEXER
 
 // COMMENTS
-SINGLE_COMMENT: '//' ~[\r\n]* -> skip ;
-BLOCK_COMMENT: '/*' .*? '*/' -> skip ;
+SINGLE_COMMENT: '//' ~[\r\n]* -> channel(HIDDEN);
+BLOCK_COMMENT: '/*' .*? '*/' -> channel(HIDDEN);
 
 // KEYWORDS
 LET: 'let' ;
