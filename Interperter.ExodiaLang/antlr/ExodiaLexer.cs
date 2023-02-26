@@ -19,7 +19,6 @@
 // Ambiguous reference in cref attribute
 #pragma warning disable 419
 
-namespace Interperter.ExodiaLang {
 using System;
 using System.IO;
 using System.Text;
@@ -37,7 +36,7 @@ public partial class ExodiaLexer : Lexer {
 		T__0=1, T__1=2, T__2=3, T__3=4, T__4=5, T__5=6, T__6=7, T__7=8, T__8=9, 
 		SINGLE_COMMENT=10, BLOCK_COMMENT=11, LET=12, RETURN=13, FN=14, IF=15, 
 		ELSE=16, WHILE=17, DO=18, FOR=19, CLASS=20, EXTENDS=21, THIS=22, SUPER=23, 
-		NEW=24, WHITESPACE=25, NUMBER=26, STRING=27, TRUE=28, FALSE=29, ADDITIVE_OPERATOR=30, 
+		NEW=24, WHITESPACE=25, INT=26, STRING=27, TRUE=28, FALSE=29, ADDITIVE_OPERATOR=30, 
 		MULTIPLICATIVE_OPERATOR=31, EQUALITY_OPERATOR=32, RELATIONAL_OPERATOR=33, 
 		LOGICAL_OR=34, LOGICAL_AND=35, SIMPLE_ASSIGNMENT_OPERATOR=36, COMPLEX_ASSIGMENT_OPERATOR=37, 
 		IDENTIFIER=38;
@@ -53,7 +52,7 @@ public partial class ExodiaLexer : Lexer {
 		"T__0", "T__1", "T__2", "T__3", "T__4", "T__5", "T__6", "T__7", "T__8", 
 		"SINGLE_COMMENT", "BLOCK_COMMENT", "LET", "RETURN", "FN", "IF", "ELSE", 
 		"WHILE", "DO", "FOR", "CLASS", "EXTENDS", "THIS", "SUPER", "NEW", "WHITESPACE", 
-		"NUMBER", "STRING", "TRUE", "FALSE", "ADDITIVE_OPERATOR", "MULTIPLICATIVE_OPERATOR", 
+		"INT", "STRING", "TRUE", "FALSE", "ADDITIVE_OPERATOR", "MULTIPLICATIVE_OPERATOR", 
 		"EQUALITY_OPERATOR", "RELATIONAL_OPERATOR", "LOGICAL_OR", "LOGICAL_AND", 
 		"SIMPLE_ASSIGNMENT_OPERATOR", "COMPLEX_ASSIGMENT_OPERATOR", "IDENTIFIER"
 	};
@@ -69,7 +68,7 @@ public partial class ExodiaLexer : Lexer {
 	}
 
 	private static readonly string[] _LiteralNames = {
-		null, "'('", "';'", "')'", "','", "'{'", "'}'", "'.'", "'['", "']'", null, 
+		null, "'{'", "','", "'}'", "'('", "';'", "')'", "'.'", "'['", "']'", null, 
 		null, "'let'", "'return'", "'fn'", "'if'", "'else'", "'while'", "'do'", 
 		"'for'", "'class'", "'extends'", "'this'", "'super'", "'new'", null, null, 
 		null, "'true'", "'false'", null, null, null, null, "'||'", "'&&'"
@@ -77,7 +76,7 @@ public partial class ExodiaLexer : Lexer {
 	private static readonly string[] _SymbolicNames = {
 		null, null, null, null, null, null, null, null, null, null, "SINGLE_COMMENT", 
 		"BLOCK_COMMENT", "LET", "RETURN", "FN", "IF", "ELSE", "WHILE", "DO", "FOR", 
-		"CLASS", "EXTENDS", "THIS", "SUPER", "NEW", "WHITESPACE", "NUMBER", "STRING", 
+		"CLASS", "EXTENDS", "THIS", "SUPER", "NEW", "WHITESPACE", "INT", "STRING", 
 		"TRUE", "FALSE", "ADDITIVE_OPERATOR", "MULTIPLICATIVE_OPERATOR", "EQUALITY_OPERATOR", 
 		"RELATIONAL_OPERATOR", "LOGICAL_OR", "LOGICAL_AND", "SIMPLE_ASSIGNMENT_OPERATOR", 
 		"COMPLEX_ASSIGMENT_OPERATOR", "IDENTIFIER"
@@ -148,9 +147,9 @@ public partial class ExodiaLexer : Lexer {
 		169,1,0,0,0,45,174,1,0,0,0,47,180,1,0,0,0,49,185,1,0,0,0,51,192,1,0,0,
 		0,53,196,1,0,0,0,55,205,1,0,0,0,57,210,1,0,0,0,59,216,1,0,0,0,61,218,1,
 		0,0,0,63,220,1,0,0,0,65,223,1,0,0,0,67,227,1,0,0,0,69,230,1,0,0,0,71,233,
-		1,0,0,0,73,235,1,0,0,0,75,238,1,0,0,0,77,78,5,40,0,0,78,2,1,0,0,0,79,80,
-		5,59,0,0,80,4,1,0,0,0,81,82,5,41,0,0,82,6,1,0,0,0,83,84,5,44,0,0,84,8,
-		1,0,0,0,85,86,5,123,0,0,86,10,1,0,0,0,87,88,5,125,0,0,88,12,1,0,0,0,89,
+		1,0,0,0,73,235,1,0,0,0,75,238,1,0,0,0,77,78,5,123,0,0,78,2,1,0,0,0,79,
+		80,5,44,0,0,80,4,1,0,0,0,81,82,5,125,0,0,82,6,1,0,0,0,83,84,5,40,0,0,84,
+		8,1,0,0,0,85,86,5,59,0,0,86,10,1,0,0,0,87,88,5,41,0,0,88,12,1,0,0,0,89,
 		90,5,46,0,0,90,14,1,0,0,0,91,92,5,91,0,0,92,16,1,0,0,0,93,94,5,93,0,0,
 		94,18,1,0,0,0,95,96,5,47,0,0,96,97,5,47,0,0,97,101,1,0,0,0,98,100,8,0,
 		0,0,99,98,1,0,0,0,100,103,1,0,0,0,101,99,1,0,0,0,101,102,1,0,0,0,102,104,
@@ -197,4 +196,3 @@ public partial class ExodiaLexer : Lexer {
 
 
 }
-} // namespace Interperter.ExodiaLang

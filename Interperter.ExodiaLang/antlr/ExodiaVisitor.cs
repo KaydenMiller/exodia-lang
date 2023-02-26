@@ -19,7 +19,6 @@
 // Ambiguous reference in cref attribute
 #pragma warning disable 419
 
-namespace Interperter.ExodiaLang {
 using Antlr4.Runtime.Misc;
 using Antlr4.Runtime.Tree;
 using IToken = Antlr4.Runtime.IToken;
@@ -33,17 +32,23 @@ using IToken = Antlr4.Runtime.IToken;
 [System.CLSCompliant(false)]
 public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.init"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitInit([NotNull] ExodiaParser.InitContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.value"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitValue([NotNull] ExodiaParser.ValueContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.program"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitProgram([NotNull] ExodiaParser.ProgramContext context);
-	/// <summary>
-	/// Visit a parse tree produced by <see cref="ExodiaParser.statement_list"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitStatement_list([NotNull] ExodiaParser.Statement_listContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.statement"/>.
 	/// </summary>
@@ -285,11 +290,12 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitParenthesized_expression([NotNull] ExodiaParser.Parenthesized_expressionContext context);
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="ExodiaParser.literal"/>.
+	/// Visit a parse tree produced by the <c>atom</c>
+	/// labeled alternative in <see cref="ExodiaParser.literal"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
-	Result VisitLiteral([NotNull] ExodiaParser.LiteralContext context);
+	Result VisitAtom([NotNull] ExodiaParser.AtomContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.true_literal"/>.
 	/// </summary>
@@ -315,4 +321,3 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitString_literal([NotNull] ExodiaParser.String_literalContext context);
 }
-} // namespace Interperter.ExodiaLang

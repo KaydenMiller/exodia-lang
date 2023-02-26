@@ -5,26 +5,27 @@ using Interperter.ExodiaLang;
 
 try
 {
-    var input = "";
-    var text = new StringBuilder();
-    Console.WriteLine("Input your expression");
-
-    while ((input = Console.ReadLine()) != "u0004")
+    do
     {
-        text.AppendLine(input);
-    }
+        var text = new StringBuilder();
+        Console.WriteLine("Input your expression");
+        var input = Console.ReadLine();
 
-    var inputStream = new AntlrInputStream(text.ToString());
-    var exodiaParserLexer = new ExodiaLexer(inputStream);
-    var commonTokenStream = new CommonTokenStream(exodiaParserLexer);
-    var parser = new ExodiaParser(commonTokenStream);
-    var walker = new ParseTreeWalker();
- 
-   var listener = new EvalExodiaListener(new Stack<object>());
-   var program = parser.program();
-    walker.Walk(listener, program);
-    // var visitor = new EvalExodiaVisitor(new Stack<object>());
-    // visitor.Visit(program);
+        if (input == "quit();")
+        {
+            break;
+        }
+        
+        text.AppendLine(input);
+
+        var inputStream = new AntlrInputStream(text.ToString());
+        var exodiaParserLexer = new ExodiaLexer(inputStream);
+        var commonTokenStream = new CommonTokenStream(exodiaParserLexer);
+        var parser = new ExodiaParser(commonTokenStream);
+        var tree = parser.init();
+        var walker = new ParseTreeWalker();
+        walker.Walk(new EvalExodiaListener(new Stack<object>()), tree);
+    } while (true);
 }
 catch (Exception ex)
 {

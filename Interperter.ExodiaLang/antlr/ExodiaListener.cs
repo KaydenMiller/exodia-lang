@@ -19,7 +19,6 @@
 // Ambiguous reference in cref attribute
 #pragma warning disable 419
 
-namespace Interperter.ExodiaLang {
 using Antlr4.Runtime.Misc;
 using IParseTreeListener = Antlr4.Runtime.Tree.IParseTreeListener;
 using IToken = Antlr4.Runtime.IToken;
@@ -32,6 +31,26 @@ using IToken = Antlr4.Runtime.IToken;
 [System.CLSCompliant(false)]
 public interface IExodiaListener : IParseTreeListener {
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.init"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterInit([NotNull] ExodiaParser.InitContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.init"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitInit([NotNull] ExodiaParser.InitContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.value"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterValue([NotNull] ExodiaParser.ValueContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.value"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitValue([NotNull] ExodiaParser.ValueContext context);
+	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.program"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
@@ -41,16 +60,6 @@ public interface IExodiaListener : IParseTreeListener {
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	void ExitProgram([NotNull] ExodiaParser.ProgramContext context);
-	/// <summary>
-	/// Enter a parse tree produced by <see cref="ExodiaParser.statement_list"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	void EnterStatement_list([NotNull] ExodiaParser.Statement_listContext context);
-	/// <summary>
-	/// Exit a parse tree produced by <see cref="ExodiaParser.statement_list"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	void ExitStatement_list([NotNull] ExodiaParser.Statement_listContext context);
 	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.statement"/>.
 	/// </summary>
@@ -452,15 +461,17 @@ public interface IExodiaListener : IParseTreeListener {
 	/// <param name="context">The parse tree.</param>
 	void ExitParenthesized_expression([NotNull] ExodiaParser.Parenthesized_expressionContext context);
 	/// <summary>
-	/// Enter a parse tree produced by <see cref="ExodiaParser.literal"/>.
+	/// Enter a parse tree produced by the <c>atom</c>
+	/// labeled alternative in <see cref="ExodiaParser.literal"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
-	void EnterLiteral([NotNull] ExodiaParser.LiteralContext context);
+	void EnterAtom([NotNull] ExodiaParser.AtomContext context);
 	/// <summary>
-	/// Exit a parse tree produced by <see cref="ExodiaParser.literal"/>.
+	/// Exit a parse tree produced by the <c>atom</c>
+	/// labeled alternative in <see cref="ExodiaParser.literal"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
-	void ExitLiteral([NotNull] ExodiaParser.LiteralContext context);
+	void ExitAtom([NotNull] ExodiaParser.AtomContext context);
 	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.true_literal"/>.
 	/// </summary>
@@ -502,4 +513,3 @@ public interface IExodiaListener : IParseTreeListener {
 	/// <param name="context">The parse tree.</param>
 	void ExitString_literal([NotNull] ExodiaParser.String_literalContext context);
 }
-} // namespace Interperter.ExodiaLang

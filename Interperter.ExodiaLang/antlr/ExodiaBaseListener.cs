@@ -19,7 +19,6 @@
 // Ambiguous reference in cref attribute
 #pragma warning disable 419
 
-namespace Interperter.ExodiaLang {
 
 using Antlr4.Runtime.Misc;
 using IErrorNode = Antlr4.Runtime.Tree.IErrorNode;
@@ -37,6 +36,30 @@ using ParserRuleContext = Antlr4.Runtime.ParserRuleContext;
 [System.CLSCompliant(false)]
 public partial class ExodiaBaseListener : IExodiaListener {
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.init"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterInit([NotNull] ExodiaParser.InitContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.init"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitInit([NotNull] ExodiaParser.InitContext context) { }
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.value"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterValue([NotNull] ExodiaParser.ValueContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.value"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitValue([NotNull] ExodiaParser.ValueContext context) { }
+	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.program"/>.
 	/// <para>The default implementation does nothing.</para>
 	/// </summary>
@@ -48,18 +71,6 @@ public partial class ExodiaBaseListener : IExodiaListener {
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	public virtual void ExitProgram([NotNull] ExodiaParser.ProgramContext context) { }
-	/// <summary>
-	/// Enter a parse tree produced by <see cref="ExodiaParser.statement_list"/>.
-	/// <para>The default implementation does nothing.</para>
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	public virtual void EnterStatement_list([NotNull] ExodiaParser.Statement_listContext context) { }
-	/// <summary>
-	/// Exit a parse tree produced by <see cref="ExodiaParser.statement_list"/>.
-	/// <para>The default implementation does nothing.</para>
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	public virtual void ExitStatement_list([NotNull] ExodiaParser.Statement_listContext context) { }
 	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.statement"/>.
 	/// <para>The default implementation does nothing.</para>
@@ -541,17 +552,19 @@ public partial class ExodiaBaseListener : IExodiaListener {
 	/// <param name="context">The parse tree.</param>
 	public virtual void ExitParenthesized_expression([NotNull] ExodiaParser.Parenthesized_expressionContext context) { }
 	/// <summary>
-	/// Enter a parse tree produced by <see cref="ExodiaParser.literal"/>.
+	/// Enter a parse tree produced by the <c>atom</c>
+	/// labeled alternative in <see cref="ExodiaParser.literal"/>.
 	/// <para>The default implementation does nothing.</para>
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
-	public virtual void EnterLiteral([NotNull] ExodiaParser.LiteralContext context) { }
+	public virtual void EnterAtom([NotNull] ExodiaParser.AtomContext context) { }
 	/// <summary>
-	/// Exit a parse tree produced by <see cref="ExodiaParser.literal"/>.
+	/// Exit a parse tree produced by the <c>atom</c>
+	/// labeled alternative in <see cref="ExodiaParser.literal"/>.
 	/// <para>The default implementation does nothing.</para>
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
-	public virtual void ExitLiteral([NotNull] ExodiaParser.LiteralContext context) { }
+	public virtual void ExitAtom([NotNull] ExodiaParser.AtomContext context) { }
 	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.true_literal"/>.
 	/// <para>The default implementation does nothing.</para>
@@ -614,4 +627,3 @@ public partial class ExodiaBaseListener : IExodiaListener {
 	/// <remarks>The default implementation does nothing.</remarks>
 	public virtual void VisitErrorNode([NotNull] IErrorNode node) { }
 }
-} // namespace Interperter.ExodiaLang

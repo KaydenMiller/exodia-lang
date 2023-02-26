@@ -18,4 +18,8 @@
       <PackageReference Include="Antlr4.Runtime.Standard" Version="4.11.1" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="antlr" />
+    </ItemGroup>
+
 </Project>

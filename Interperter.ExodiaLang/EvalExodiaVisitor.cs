@@ -13,11 +13,12 @@ public class EvalExodiaVisitor : ExodiaBaseVisitor<object>
 
     public override object VisitNumeric_literal(ExodiaParser.Numeric_literalContext context)
     {
-        var value = int.Parse(context.atom.Text);
-        
-        _stack.Push(value);
+        // var value = int.Parse(context.INT());
+        //
+        // _stack.Push(value);
 
-        return value;
+        // return value;
+        return base.VisitNumeric_literal(context);
     }
 
     public override object VisitAdditive_expression(ExodiaParser.Additive_expressionContext context)

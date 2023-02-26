@@ -22,7 +22,7 @@ SUPER: 'super';
 NEW: 'new' ;
 
 WHITESPACE: [ \t\n\r\f]+ -> skip ;
-NUMBER: [0-9]+ ;
+INT: [0-9]+ ;
 STRING: '"' ~'"'* '"' ;
 TRUE: 'true' ;
 FALSE: 'false' ;
@@ -39,6 +39,9 @@ COMPLEX_ASSIGMENT_OPERATOR: [*/+\-]'=' ;
 IDENTIFIER: [a-zA-Z] [a-zA-Z1-9]* ;
 
 // PARSER
+
+init: '{' value (',' value)* '}' ;
+value: init | INT;
     
 program: statement* EOF; // THE ? is so you can have an empty file
 
@@ -258,7 +261,7 @@ false_literal
     ;
     
 numeric_literal
-    : NUMBER
+    : INT
     ;
     
 string_literal

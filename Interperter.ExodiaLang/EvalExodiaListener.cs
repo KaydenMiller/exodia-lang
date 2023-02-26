@@ -8,27 +8,20 @@ public class EvalExodiaListener : ExodiaBaseListener
     {
         _stack = stack;
     }
-    
-    public override void ExitNumeric_literal(ExodiaParser.Numeric_literalContext context)
+
+    public override void EnterInit(ExodiaParser.InitContext context)
     {
-        _stack.Push(int.Parse(context.atom.Text));
-        base.ExitNumeric_literal(context);
+        Console.Write("\"");
     }
 
-    public override void ExitAdditive_expression(ExodiaParser.Additive_expressionContext context)
+    public override void ExitInit(ExodiaParser.InitContext context)
     {
-        var right = (int)_stack.Pop();
-        var left = (int)_stack.Pop();
+        Console.Write("\"");
+    }
 
-        if (context.op.Text == "+")
-        {
-            _stack.Push(left + right);
-        } 
-        else if (context.op.Text == "-")
-        {
-            _stack.Push(left - right);
-        }
-
-        base.ExitAdditive_expression(context);
+    public override void EnterValue(ExodiaParser.ValueContext context)
+    {
+        int value = int.Parse(context.INT().GetText());
+        Console.Write(value.ToString("X") + " ");
     }
 }
