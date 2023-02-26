@@ -1,4 +1,3 @@
-using Antlr4.Runtime.Tree;
 using FluentAssertions;
 using Interperter.ExodiaLang;
 
@@ -8,6 +7,9 @@ public class AdditiveExpressions
 {
     [Theory]
     [InlineData("1 + 2;", 3)]
+    [InlineData("5 + 5;", 10)]
+    [InlineData("100 + 5;", 105)]
+    [InlineData("100 - 5;", 95)]
     public void GivenValidInput_WhenAddExpression_ShouldResolveToCorrectValue(string value, int expected)
     {
         // Arrange
@@ -15,14 +17,11 @@ public class AdditiveExpressions
         var stack = new Stack<object>();
 
         // Act
-        var program = parser.program();
-        var listener = new EvalExodiaListener(stack);
-        var walker = new ParseTreeWalker();
-        walker.Walk(listener, program);
+        var program = parser.additive_expression();
+        var visitor = new EvalExodiaVisitor(stack);
+        var result = visitor.Visit(program);
 
         // Assert
-        var top = stack.Pop();
-        top.Should().BeOfType<int>();
-        ((int)top).Should().Be(expected);
+        result.Should().Be(expected);
     }
 }

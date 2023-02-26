@@ -27,13 +27,17 @@ STRING: '"' ~'"'* '"' ;
 TRUE: 'true' ;
 FALSE: 'false' ;
 
+fragment
 ADD: '+';
+fragment
 SUB: '-';
-ADDITIVE_OPERATOR: [+\-] ;
+ADDITIVE_OPERATOR: ADD | SUB ;
 
+fragment
 MUL: '*';
+fragment
 DIV: '/';
-MULTIPLICATIVE_OPERATOR: [*/] ;
+MULTIPLICATIVE_OPERATOR: MUL | DIV ;
 
 EQUALITY_OPERATOR: [=!]'=' ;
 RELATIONAL_OPERATOR: [><]'='? ;
@@ -44,7 +48,6 @@ SIMPLE_ASSIGNMENT_OPERATOR: [=] ;
 COMPLEX_ASSIGMENT_OPERATOR: [*/+\-]'=' ;
 
 IDENTIFIER: [a-zA-Z] [a-zA-Z1-9]* ;
-NEWLINE: '\r'? '\n';
 
 SEMI: ';';
 
@@ -53,23 +56,6 @@ SEMI: ';';
 program: statement* EOF; // THE ? is so you can have an empty file
 
 // STATEMENTS
-
-prog
-    : stat+ ;
-
-stat
-    : expr SEMI                  #printExpr
-    | IDENTIFIER '=' expr SEMI   #assign       
-    | SEMI                       #blank
-    ;
-    
-expr
-    : expr op=('*'|'/') expr      #MulDiv
-    | expr op=('+'|'-') expr            #AddSub
-    | INT                                       #int
-    | IDENTIFIER                                #id
-    | '(' expr ')'                              #parens
-    ;
 
 statement
     : expression_statement 
@@ -161,7 +147,7 @@ expression_statement
     ;
     
 expression
-    : assignment_expression 
+    :  additive_expression
     ;
     
 assignment_expression
@@ -224,9 +210,9 @@ multiplicative_expression
     ;
     
 unary_expression
-    : primary_expression
+    : primary_expression 
     | call_expression
-    | ADDITIVE_OPERATOR unary_expression
+    | op=ADDITIVE_OPERATOR unary_expression
     ;
    
 call_expression

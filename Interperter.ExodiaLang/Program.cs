@@ -18,7 +18,7 @@ try
     var commonTokenStream = new CommonTokenStream(exodiaParserLexer);
     var parser = new ExodiaParser(commonTokenStream);
 
-    var tree = parser.prog();
+    var tree = parser.program();
 
     var eval = new EvalExodiaVisitor(new Stack<object>());
     eval.Visit(tree);
