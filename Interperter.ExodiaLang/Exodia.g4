@@ -26,8 +26,15 @@ INT: [0-9]+ ;
 STRING: '"' ~'"'* '"' ;
 TRUE: 'true' ;
 FALSE: 'false' ;
+
+ADD: '+';
+SUB: '-';
 ADDITIVE_OPERATOR: [+\-] ;
+
+MUL: '*';
+DIV: '/';
 MULTIPLICATIVE_OPERATOR: [*/] ;
+
 EQUALITY_OPERATOR: [=!]'=' ;
 RELATIONAL_OPERATOR: [><]'='? ;
 LOGICAL_OR: '||' ;
@@ -37,15 +44,32 @@ SIMPLE_ASSIGNMENT_OPERATOR: [=] ;
 COMPLEX_ASSIGMENT_OPERATOR: [*/+\-]'=' ;
 
 IDENTIFIER: [a-zA-Z] [a-zA-Z1-9]* ;
+NEWLINE: '\r'? '\n';
+
+SEMI: ';';
 
 // PARSER
 
-init: '{' value (',' value)* '}' ;
-value: init | INT;
-    
 program: statement* EOF; // THE ? is so you can have an empty file
 
 // STATEMENTS
+
+prog
+    : stat+ ;
+
+stat
+    : expr SEMI                  #printExpr
+    | IDENTIFIER '=' expr SEMI   #assign       
+    | SEMI                       #blank
+    ;
+    
+expr
+    : expr op=('*'|'/') expr      #MulDiv
+    | expr op=('+'|'-') expr            #AddSub
+    | INT                                       #int
+    | IDENTIFIER                                #id
+    | '(' expr ')'                              #parens
+    ;
 
 statement
     : expression_statement 

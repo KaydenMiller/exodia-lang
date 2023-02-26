@@ -31,26 +31,6 @@ using IToken = Antlr4.Runtime.IToken;
 [System.CLSCompliant(false)]
 public interface IExodiaListener : IParseTreeListener {
 	/// <summary>
-	/// Enter a parse tree produced by <see cref="ExodiaParser.init"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	void EnterInit([NotNull] ExodiaParser.InitContext context);
-	/// <summary>
-	/// Exit a parse tree produced by <see cref="ExodiaParser.init"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	void ExitInit([NotNull] ExodiaParser.InitContext context);
-	/// <summary>
-	/// Enter a parse tree produced by <see cref="ExodiaParser.value"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	void EnterValue([NotNull] ExodiaParser.ValueContext context);
-	/// <summary>
-	/// Exit a parse tree produced by <see cref="ExodiaParser.value"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	void ExitValue([NotNull] ExodiaParser.ValueContext context);
-	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.program"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
@@ -60,6 +40,112 @@ public interface IExodiaListener : IParseTreeListener {
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	void ExitProgram([NotNull] ExodiaParser.ProgramContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.prog"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterProg([NotNull] ExodiaParser.ProgContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.prog"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitProg([NotNull] ExodiaParser.ProgContext context);
+	/// <summary>
+	/// Enter a parse tree produced by the <c>printExpr</c>
+	/// labeled alternative in <see cref="ExodiaParser.stat"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterPrintExpr([NotNull] ExodiaParser.PrintExprContext context);
+	/// <summary>
+	/// Exit a parse tree produced by the <c>printExpr</c>
+	/// labeled alternative in <see cref="ExodiaParser.stat"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitPrintExpr([NotNull] ExodiaParser.PrintExprContext context);
+	/// <summary>
+	/// Enter a parse tree produced by the <c>assign</c>
+	/// labeled alternative in <see cref="ExodiaParser.stat"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterAssign([NotNull] ExodiaParser.AssignContext context);
+	/// <summary>
+	/// Exit a parse tree produced by the <c>assign</c>
+	/// labeled alternative in <see cref="ExodiaParser.stat"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitAssign([NotNull] ExodiaParser.AssignContext context);
+	/// <summary>
+	/// Enter a parse tree produced by the <c>blank</c>
+	/// labeled alternative in <see cref="ExodiaParser.stat"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterBlank([NotNull] ExodiaParser.BlankContext context);
+	/// <summary>
+	/// Exit a parse tree produced by the <c>blank</c>
+	/// labeled alternative in <see cref="ExodiaParser.stat"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitBlank([NotNull] ExodiaParser.BlankContext context);
+	/// <summary>
+	/// Enter a parse tree produced by the <c>parens</c>
+	/// labeled alternative in <see cref="ExodiaParser.expr"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterParens([NotNull] ExodiaParser.ParensContext context);
+	/// <summary>
+	/// Exit a parse tree produced by the <c>parens</c>
+	/// labeled alternative in <see cref="ExodiaParser.expr"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitParens([NotNull] ExodiaParser.ParensContext context);
+	/// <summary>
+	/// Enter a parse tree produced by the <c>MulDiv</c>
+	/// labeled alternative in <see cref="ExodiaParser.expr"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterMulDiv([NotNull] ExodiaParser.MulDivContext context);
+	/// <summary>
+	/// Exit a parse tree produced by the <c>MulDiv</c>
+	/// labeled alternative in <see cref="ExodiaParser.expr"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitMulDiv([NotNull] ExodiaParser.MulDivContext context);
+	/// <summary>
+	/// Enter a parse tree produced by the <c>AddSub</c>
+	/// labeled alternative in <see cref="ExodiaParser.expr"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterAddSub([NotNull] ExodiaParser.AddSubContext context);
+	/// <summary>
+	/// Exit a parse tree produced by the <c>AddSub</c>
+	/// labeled alternative in <see cref="ExodiaParser.expr"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitAddSub([NotNull] ExodiaParser.AddSubContext context);
+	/// <summary>
+	/// Enter a parse tree produced by the <c>id</c>
+	/// labeled alternative in <see cref="ExodiaParser.expr"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterId([NotNull] ExodiaParser.IdContext context);
+	/// <summary>
+	/// Exit a parse tree produced by the <c>id</c>
+	/// labeled alternative in <see cref="ExodiaParser.expr"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitId([NotNull] ExodiaParser.IdContext context);
+	/// <summary>
+	/// Enter a parse tree produced by the <c>int</c>
+	/// labeled alternative in <see cref="ExodiaParser.expr"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterInt([NotNull] ExodiaParser.IntContext context);
+	/// <summary>
+	/// Exit a parse tree produced by the <c>int</c>
+	/// labeled alternative in <see cref="ExodiaParser.expr"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitInt([NotNull] ExodiaParser.IntContext context);
 	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.statement"/>.
 	/// </summary>

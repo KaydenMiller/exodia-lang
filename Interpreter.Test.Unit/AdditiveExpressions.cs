@@ -13,7 +13,7 @@ public class AdditiveExpressions
         // Arrange
         var parser = Helpers.SetupParser(value);
         var stack = new Stack<object>();
-        
+
         // Act
         var program = parser.program();
         var listener = new EvalExodiaListener(stack);

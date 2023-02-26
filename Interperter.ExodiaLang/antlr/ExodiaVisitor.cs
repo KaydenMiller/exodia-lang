@@ -32,23 +32,73 @@ using IToken = Antlr4.Runtime.IToken;
 [System.CLSCompliant(false)]
 public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="ExodiaParser.init"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitInit([NotNull] ExodiaParser.InitContext context);
-	/// <summary>
-	/// Visit a parse tree produced by <see cref="ExodiaParser.value"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitValue([NotNull] ExodiaParser.ValueContext context);
-	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.program"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitProgram([NotNull] ExodiaParser.ProgramContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.prog"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitProg([NotNull] ExodiaParser.ProgContext context);
+	/// <summary>
+	/// Visit a parse tree produced by the <c>printExpr</c>
+	/// labeled alternative in <see cref="ExodiaParser.stat"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitPrintExpr([NotNull] ExodiaParser.PrintExprContext context);
+	/// <summary>
+	/// Visit a parse tree produced by the <c>assign</c>
+	/// labeled alternative in <see cref="ExodiaParser.stat"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitAssign([NotNull] ExodiaParser.AssignContext context);
+	/// <summary>
+	/// Visit a parse tree produced by the <c>blank</c>
+	/// labeled alternative in <see cref="ExodiaParser.stat"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitBlank([NotNull] ExodiaParser.BlankContext context);
+	/// <summary>
+	/// Visit a parse tree produced by the <c>parens</c>
+	/// labeled alternative in <see cref="ExodiaParser.expr"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitParens([NotNull] ExodiaParser.ParensContext context);
+	/// <summary>
+	/// Visit a parse tree produced by the <c>MulDiv</c>
+	/// labeled alternative in <see cref="ExodiaParser.expr"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitMulDiv([NotNull] ExodiaParser.MulDivContext context);
+	/// <summary>
+	/// Visit a parse tree produced by the <c>AddSub</c>
+	/// labeled alternative in <see cref="ExodiaParser.expr"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitAddSub([NotNull] ExodiaParser.AddSubContext context);
+	/// <summary>
+	/// Visit a parse tree produced by the <c>id</c>
+	/// labeled alternative in <see cref="ExodiaParser.expr"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitId([NotNull] ExodiaParser.IdContext context);
+	/// <summary>
+	/// Visit a parse tree produced by the <c>int</c>
+	/// labeled alternative in <see cref="ExodiaParser.expr"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitInt([NotNull] ExodiaParser.IntContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.statement"/>.
 	/// </summary>

@@ -1,39 +1,75 @@
-﻿using Antlr4.Runtime.Tree;
+﻿namespace Interperter.ExodiaLang;
 
-namespace Interperter.ExodiaLang;
-
-public class EvalExodiaVisitor : ExodiaBaseVisitor<object>
+public class EvalExodiaVisitor : ExodiaBaseVisitor<int>
 {
     private readonly Stack<object> _stack;
+    private readonly Dictionary<string, int> _memory = new();
 
     public EvalExodiaVisitor(Stack<object> stack)
     {
         _stack = stack;
     }
 
-    public override object VisitNumeric_literal(ExodiaParser.Numeric_literalContext context)
+    public override int VisitAssign(ExodiaParser.AssignContext context)
     {
-        // var value = int.Parse(context.INT());
-        //
-        // _stack.Push(value);
+        var id = context.IDENTIFIER().GetText();
+        var value = Visit(context.expr());
 
-        // return value;
-        return base.VisitNumeric_literal(context);
+        _memory.Add(id, value);
+
+        return value;
     }
 
-    public override object VisitAdditive_expression(ExodiaParser.Additive_expressionContext context)
+    public override int VisitPrintExpr(ExodiaParser.PrintExprContext context)
     {
-        var op = context.op.Text;
+        var value = Visit(context.expr());
+        Console.WriteLine(value);
+        return 0;
+    }
 
-        if (op.Equals("+"))
+    public override int VisitInt(ExodiaParser.IntContext context)
+    {
+        return int.Parse(context.INT().GetText());
+    }
+
+    public override int VisitId(ExodiaParser.IdContext context)
+    {
+        var id = context.IDENTIFIER().GetText();
+        if (_memory.ContainsKey(id))
         {
-            // return Visit(context.left) + Visit(context.right);
+            _memory.TryGetValue(id, out var value);
+            return value;
         }
-        else if (op.Equals("-"))
+
+        return 0;
+    }
+
+    public override int VisitMulDiv(ExodiaParser.MulDivContext context)
+    {
+        var left = Visit(context.expr(0));
+        var right = Visit(context.expr(1));
+        if (context.op.Type == ExodiaParser.MUL)
         {
-            throw new NotImplementedException();
+            return left * right;
         }
-        
-        return base.VisitAdditive_expression(context);
+
+        return left / right;
+    }
+
+    public override int VisitAddSub(ExodiaParser.AddSubContext context)
+    {
+        var left = Visit(context.expr(0));
+        var right = Visit(context.expr(1));
+        if (context.op.Type == ExodiaParser.ADD)
+        {
+            return left + right;
+        }
+
+        return left - right;
+    }
+
+    public override int VisitParens(ExodiaParser.ParensContext context)
+    {
+        return Visit(context.expr());
     }
 }

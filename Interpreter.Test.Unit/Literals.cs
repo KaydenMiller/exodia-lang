@@ -15,7 +15,7 @@ public class Literals
         // Arrange
         var parser = Helpers.SetupParser(value);
         var stack = new Stack<object>();
-        
+
         // Act
         var program = parser.program();
         var visitor = new EvalExodiaVisitor(stack);
