@@ -4,6 +4,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Interpreter.Test.Unit", "In
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Interperter.ExodiaLang", "Interperter.ExodiaLang\Interperter.ExodiaLang.csproj", "{F51ED087-2CEF-4449-89D3-6296048393DB}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Interperter.Kaleidoscope", "Interperter.Kaleidoscope\Interperter.Kaleidoscope.csproj", "{E3B8BF16-7DFC-4F9C-8B82-2EBDB5EDA823}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -18,5 +20,9 @@ Global
 		{F51ED087-2CEF-4449-89D3-6296048393DB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F51ED087-2CEF-4449-89D3-6296048393DB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F51ED087-2CEF-4449-89D3-6296048393DB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E3B8BF16-7DFC-4F9C-8B82-2EBDB5EDA823}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E3B8BF16-7DFC-4F9C-8B82-2EBDB5EDA823}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E3B8BF16-7DFC-4F9C-8B82-2EBDB5EDA823}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E3B8BF16-7DFC-4F9C-8B82-2EBDB5EDA823}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
