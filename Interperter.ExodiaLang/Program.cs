@@ -8,10 +8,7 @@ try
 
     var lines = File.ReadAllLines("./tests/simple-script.ex", Encoding.UTF8);
 
-    foreach (var line in lines)
-    {
-        text.AppendLine(line);
-    }
+    foreach (var line in lines) text.AppendLine(line);
 
     var inputStream = new AntlrInputStream(text.ToString());
     var exodiaParserLexer = new ExodiaLexer(inputStream);

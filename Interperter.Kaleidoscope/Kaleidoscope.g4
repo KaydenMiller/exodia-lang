@@ -9,21 +9,16 @@ NUMBER: [0-9.]+ ;
 
 IDENTIFIER: [a-zA-Z] [a-zA-Z0-9]* ;
 
-fragment
-ADD: '+' ;
-fragment
-SUB: '-' ;
-fragment
-MUL: '*' ;
-fragment
-LESS: '<' ;
-
+fragment ADD: '+' ;
+fragment SUB: '-' ;
+fragment MUL: '*' ;
+fragment LESS: '<' ;
 OP: ADD | SUB | MUL | LESS ;
 
 program: definition | external | expression | ';' ;
 
 expression
-    : lhs=primary binaryExpression
+    : primary binaryExpression
     | primary
     ;
     
@@ -33,12 +28,12 @@ external: EXTERN prototype ;
 prototype: IDENTIFIER '(' IDENTIFIER* ')' ;
     
 binaryExpression 
-    : OP expression             #continuedBinaryExpression
-    | OP rhs=primary            #finalBinaryExpression
+    : OP expression         #continuedBinaryExpression
+    | OP primary            #finalBinaryExpression
     ;
     
 identifierExpression
-    : IDENTIFIER '(' (expression ',')* ')' #callExpression
+    : IDENTIFIER '(' (expression ',')* ')'  #callExpression
     | IDENTIFIER                            #variableExpression
     ;
     

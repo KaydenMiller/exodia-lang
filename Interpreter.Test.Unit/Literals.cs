@@ -17,13 +17,11 @@ public class Literals
         var stack = new Stack<object>();
 
         // Act
-        var program = parser.program();
+        var program = parser.literal();
         var visitor = new EvalExodiaVisitor(stack);
-        visitor.Visit(program);
+        var result = visitor.Visit(program);
 
         // Assert
-        var top = stack.Pop();
-        top.Should().BeOfType<int>();
-        ((int)top).Should().Be(expected);
+        result.Should().Be(expected);
     }
 }

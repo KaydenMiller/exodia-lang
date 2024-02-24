@@ -84,7 +84,7 @@ iteration_statement
     ;
     
 for_statement
-    : FOR '(' variable_statement equality_expression ';' expression ')' statement
+    : FOR '(' variable_statement equality_expression SEMI expression ')' statement
     ;
     
 do_while_statement
@@ -96,7 +96,7 @@ while_statement
     ;
     
 variable_statement
-    : LET variable_declaration_list ';'
+    : LET variable_declaration_list SEMI 
     ;
 
 variable_declaration_list
@@ -118,11 +118,11 @@ if_statement
     ;
 
 empty_statement
-    : ';'
+    : SEMI 
     ;
 
 return_statement
-    : RETURN expression? ';'
+    : RETURN expression? SEMI 
     ;
     
 block_statement
@@ -143,7 +143,7 @@ formal_parameter_list
 // EXPRESSIONS
 
 expression_statement
-    : expression ';' 
+    : expression SEMI 
     ;
     
 expression

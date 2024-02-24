@@ -1,12 +1,11 @@
-﻿using LLVMSharp;
-using LLVMSharp.Interop;
+﻿using LLVMSharp.Interop;
 
 namespace Interperter.ExodiaLang;
 
 public class EvalExodiaVisitor : ExodiaBaseVisitor<LLVMValueRef>
 {
-    private readonly Stack<object> _stack;
     private readonly Dictionary<string, int> _memory = new();
+    private readonly Stack<object> _stack;
 
     public EvalExodiaVisitor(Stack<object> stack)
     {

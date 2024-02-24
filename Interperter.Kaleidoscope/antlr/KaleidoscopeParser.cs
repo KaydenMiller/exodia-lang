@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-// Generated from /Users/kaydenmiller/Documents/workspaces/personal/exodia-lang/Interperter.Kaleidoscope/Kaleidoscope.g4 by ANTLR 4.13.1
+// Generated from D:/workspaces/compilers/cspg/Grammer.ParserGenerator/Interperter.Kaleidoscope/Kaleidoscope.g4 by ANTLR 4.13.1
 
 // Unreachable code detected
 #pragma warning disable 0162
@@ -173,12 +173,11 @@ public partial class KaleidoscopeParser : Parser {
 	}
 
 	public partial class ExpressionContext : ParserRuleContext {
-		public PrimaryContext lhs;
-		[System.Diagnostics.DebuggerNonUserCode] public BinaryExpressionContext binaryExpression() {
-			return GetRuleContext<BinaryExpressionContext>(0);
-		}
 		[System.Diagnostics.DebuggerNonUserCode] public PrimaryContext primary() {
 			return GetRuleContext<PrimaryContext>(0);
+		}
+		[System.Diagnostics.DebuggerNonUserCode] public BinaryExpressionContext binaryExpression() {
+			return GetRuleContext<BinaryExpressionContext>(0);
 		}
 		public ExpressionContext(ParserRuleContext parent, int invokingState)
 			: base(parent, invokingState)
@@ -215,7 +214,7 @@ public partial class KaleidoscopeParser : Parser {
 				EnterOuterAlt(_localctx, 1);
 				{
 				State = 26;
-				_localctx.lhs = primary();
+				primary();
 				State = 27;
 				binaryExpression();
 				}
@@ -458,7 +457,6 @@ public partial class KaleidoscopeParser : Parser {
 		}
 	}
 	public partial class FinalBinaryExpressionContext : BinaryExpressionContext {
-		public PrimaryContext rhs;
 		[System.Diagnostics.DebuggerNonUserCode] public ITerminalNode OP() { return GetToken(KaleidoscopeParser.OP, 0); }
 		[System.Diagnostics.DebuggerNonUserCode] public PrimaryContext primary() {
 			return GetRuleContext<PrimaryContext>(0);
@@ -507,7 +505,7 @@ public partial class KaleidoscopeParser : Parser {
 				State = 53;
 				Match(OP);
 				State = 54;
-				((FinalBinaryExpressionContext)_localctx).rhs = primary();
+				primary();
 				}
 				break;
 			}

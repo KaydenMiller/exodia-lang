@@ -15,18 +15,18 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
-        <PackageReference Include="LLVMSharp" Version="16.0.0" />
+        <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1"/>
+        <PackageReference Include="LLVMSharp" Version="16.0.0"/>
     </ItemGroup>
 
     <ItemGroup>
-        <Folder Include="antlr" />
+        <Folder Include="antlr"/>
     </ItemGroup>
 
     <ItemGroup>
-      <None Update="tests\simple-script.ex">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
+        <None Update="tests\simple-script.ex">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
     </ItemGroup>
 
 </Project>

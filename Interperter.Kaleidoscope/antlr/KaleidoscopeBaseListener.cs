@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-// Generated from /Users/kaydenmiller/Documents/workspaces/personal/exodia-lang/Interperter.Kaleidoscope/Kaleidoscope.g4 by ANTLR 4.13.1
+// Generated from D:/workspaces/compilers/cspg/Grammer.ParserGenerator/Interperter.Kaleidoscope/Kaleidoscope.g4 by ANTLR 4.13.1
 
 // Unreachable code detected
 #pragma warning disable 0162

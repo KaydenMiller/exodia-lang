@@ -2,9 +2,13 @@ namespace Interperter.Kaleidoscope;
 
 public static class StringHelpers
 {
-    public static unsafe sbyte* ConvertToSByte(this string str)
+    public static unsafe sbyte* ToSByte(this string str)
     {
-        var sbytes = Convert.ToSByte(str);
-        return &sbytes;
+        sbyte[] sbytes = Array.ConvertAll(str.ToArray(), Convert.ToSByte);
+
+        fixed (sbyte* sbytePtr = &sbytes[0])
+        {
+            return sbytePtr;
+        }
     }
 }

@@ -9,16 +9,27 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Folder Include="antlr\" />
+        <Folder Include="antlr\"/>
     </ItemGroup>
 
     <ItemGroup>
-      <Content Include="Kaleidoscope.g4" />
+        <Content Include="Kaleidoscope.g4"/>
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
-      <PackageReference Include="LLVMSharp" Version="16.0.0" />
+        <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1"/>
+        <PackageReference Include="libLLVM" Version="16.0.6" />
+        <PackageReference Include="LLVMSharp" Version="16.0.0"/>
+    </ItemGroup>
+
+    <PropertyGroup>
+        <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">$(NETCoreSdkRuntimeIdentifier)</RuntimeIdentifier>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <None Update="tests\test_1.kl">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
     </ItemGroup>
 
 </Project>
