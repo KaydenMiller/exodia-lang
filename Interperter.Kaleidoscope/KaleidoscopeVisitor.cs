@@ -17,6 +17,8 @@ public unsafe class KaleidoscopeVisitor : KaleidoscopeBaseVisitor<int>
 
     public override int VisitNumberExpression(KaleidoscopeParser.NumberExpressionContext context)
     {
+        Console.WriteLine("Parsing a numeric expression");
+        
         if (context.NUMBER() is { } num)
         {
             var value = double.Parse(num.GetText());
@@ -28,6 +30,8 @@ public unsafe class KaleidoscopeVisitor : KaleidoscopeBaseVisitor<int>
 
     public override int VisitVariableExpression(KaleidoscopeParser.VariableExpressionContext context)
     {
+        Console.WriteLine("Parsing a variable expression");
+        
         var identifier = context.IDENTIFIER().GetText()!;
 
         if (_namedValues.TryGetValue(identifier, out var value))
@@ -44,6 +48,8 @@ public unsafe class KaleidoscopeVisitor : KaleidoscopeBaseVisitor<int>
 
     public override int VisitExpression(KaleidoscopeParser.ExpressionContext context)
     {
+        Console.WriteLine("Parsing an expression");
+        
         Visit(context.primary());
         Visit(context.binaryExpression());
         return 0;
@@ -51,11 +57,16 @@ public unsafe class KaleidoscopeVisitor : KaleidoscopeBaseVisitor<int>
 
     public override int VisitContinuedBinaryExpression(KaleidoscopeParser.ContinuedBinaryExpressionContext context)
     {
+        Console.WriteLine("Parsing a binary expression");
+        
+        Visit(context.expression());
         return 0;
     }
 
     public override int VisitFinalBinaryExpression(KaleidoscopeParser.FinalBinaryExpressionContext context)
     {
+        Console.WriteLine("Parsing a binary expression");
+        
         Visit(context.primary());
 
         var r = _valueStack.Pop();
@@ -76,6 +87,8 @@ public unsafe class KaleidoscopeVisitor : KaleidoscopeBaseVisitor<int>
 
     public override int VisitCallExpression(KaleidoscopeParser.CallExpressionContext context)
     {
+        Console.WriteLine("Parsing a call expression");
+        
         var functionId = context.IDENTIFIER().GetText()!;
         var callee = LLVM.GetNamedFunction(_module, functionId.ToSByte());
 
@@ -98,12 +111,13 @@ public unsafe class KaleidoscopeVisitor : KaleidoscopeBaseVisitor<int>
             args[i] = arg;
         }
 
-        var argsV = args.ToArrayPointer();
+        var argptr = args.ToArrayPointer();
+
         var call = LLVM.BuildCall2(
             _llvmBuilder,
             LLVM.DoubleType(),
             callee,
-            argsV,
+            &argptr,
             parameterCount,
             "calltmp".ToSByte());
 
@@ -114,6 +128,8 @@ public unsafe class KaleidoscopeVisitor : KaleidoscopeBaseVisitor<int>
 
     public override int VisitPrototype(KaleidoscopeParser.PrototypeContext context)
     {
+        Console.WriteLine("Parsing a prototype");
+        
         var argumentCount = (uint)context.IDENTIFIER().Length - 1;
         var arguments = new LLVMOpaqueType[argumentCount];
         var functionName = context.IDENTIFIER()[0].GetText()!;
@@ -136,30 +152,38 @@ public unsafe class KaleidoscopeVisitor : KaleidoscopeBaseVisitor<int>
         }
         else
         {
-            for (var i = 0; i < argumentCount; i++) arguments[i] = *LLVM.DoubleType();
+            for (var i = 0; i < argumentCount; i++) 
+            {
+                arguments[i] = *LLVM.DoubleType();
+            }
+
+            var args = arguments.ToArrayPointer();
+            var fnType = LLVM.FunctionType(
+                LLVM.DoubleType(),
+                &args,
+                argumentCount,
+                0
+            );
 
             function = LLVM.AddFunction(
                 _module,
                 functionName.ToSByte(),
-                LLVM.FunctionType(
-                    LLVM.DoubleType(),
-                    arguments.ToArrayPointer(),
-                    argumentCount,
-                    0
-                )
+                fnType
             );
 
             LLVM.SetLinkage(function, LLVMLinkage.LLVMExternalLinkage);
         }
 
-        for (var i = 0; i < argumentCount; i++)
-        {
-            var identifiers = context.IDENTIFIER()[1..]!;
-
-            var param = LLVM.GetParam(function, (uint)i);
-            var name = identifiers[i].GetText();
-            LLVM.SetValueName2(param, name.ToSByte(), (uint)name.Length);
-        }
+        // for (var i = 0; i < argumentCount; i++)
+        // {
+        //     var identifiers = context.IDENTIFIER()[1..]!
+        //        .Select(id => id.GetText())
+        //        .ToArray();
+        //
+        //     var param = LLVM.GetParam(function, (uint)i);
+        //     var name = identifiers[i];
+        //     LLVM.SetValueName2(param, name.ToSByte(), (uint)name.Length);
+        // }
 
         _valueStack.Push(*function);
         return 0;
@@ -167,10 +191,12 @@ public unsafe class KaleidoscopeVisitor : KaleidoscopeBaseVisitor<int>
 
     public override int VisitDefinition(KaleidoscopeParser.DefinitionContext context)
     {
+        Console.WriteLine("Parsing a Function Definition");
+        
+        Visit(context.prototype());
         var function = _valueStack.Pop();
         _namedValues.Clear();
-        Visit(context.prototype());
-
+        
         // create basic block to start insertion into
         LLVM.PositionBuilderAtEnd(_llvmBuilder, LLVM.AppendBasicBlock(&function, "entry".ToSByte()));
 

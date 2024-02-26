@@ -24,6 +24,8 @@ try
         eval.Visit(tree);
         
         LLVM.DumpModule(module);
+        var filePath = Directory.GetCurrentDirectory() + "/output.ll";
+        LLVM.WriteBitcodeToFile(module, filePath.ToSByte());
     }
 }
 catch (Exception ex)

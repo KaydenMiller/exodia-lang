@@ -1,1 +1,6 @@
-def foo(x y) { x + foo(y, 5.0,) };
+def fib(x y) 
+{
+    x + fib(x, 4.0,)
+};
+
+fib(40, 2);

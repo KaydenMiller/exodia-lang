@@ -4,21 +4,19 @@ namespace Interperter.Kaleidoscope;
 
 public static unsafe class LLVMExtensions
 {
-    public static LLVMOpaqueValue** ToArrayPointer(this LLVMOpaqueValue[] array)
+    public static LLVMOpaqueValue* ToArrayPointer(this LLVMOpaqueValue[] array)
     {
         fixed (LLVMOpaqueValue* start = &array[0])
         {
-            var ptr = &start;
-            return ptr;
+            return start;
         }
     }
 
-    public static LLVMOpaqueType** ToArrayPointer(this LLVMOpaqueType[] array)
+    public static LLVMOpaqueType* ToArrayPointer(this LLVMOpaqueType[] array)
     {
         fixed (LLVMOpaqueType* start = &array[0])
         {
-            var ptr = &start;
-            return ptr;
+            return start;
         }
     }
 }
