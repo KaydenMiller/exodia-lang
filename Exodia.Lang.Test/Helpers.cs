@@ -1,6 +1,6 @@
 ﻿using Antlr4.Runtime;
 
-namespace Interpreter.Test.Unit;
+namespace Exodia.Lang.Test;
 
 public static class Helpers
 {

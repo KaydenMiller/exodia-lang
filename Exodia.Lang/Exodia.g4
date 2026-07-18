@@ -22,21 +22,23 @@ SUPER: 'super';
 NEW: 'new' ;
 
 WHITESPACE: [ \t\n\r\f]+ -> skip ;
-INT: [0-9]+ ;
+
+fragment DIGITS : [0-9] ( [0-9_]* [0-9] )? ;
+INTEGER: DIGITS INTEGER_SUFFIX?;
+FLOAT: DIGITS '.' DIGITS ([eE] [+-]? DIGITS )? FLOAT_SUFFIX?;
+fragment INTEGER_SUFFIX : [iu] ('8'|'16'|'32'|'64');    // 5i8, 42u32
+fragment FLOAT_SUFFIX : 'f' | 'd' | 'm' ;               // 1.5f, 1.5m
+
 STRING: '"' ~'"'* '"' ;
 TRUE: 'true' ;
 FALSE: 'false' ;
 
-fragment
-ADD: '+';
-fragment
-SUB: '-';
+fragment ADD: '+';
+fragment SUB: '-';
 ADDITIVE_OPERATOR: ADD | SUB ;
 
-fragment
-MUL: '*';
-fragment
-DIV: '/';
+fragment MUL: '*';
+fragment DIV: '/';
 MULTIPLICATIVE_OPERATOR: MUL | DIV ;
 
 EQUALITY_OPERATOR: [=!]'=' ;
@@ -47,7 +49,7 @@ LOGICAL_AND: '&&' ;
 SIMPLE_ASSIGNMENT_OPERATOR: [=] ;
 COMPLEX_ASSIGMENT_OPERATOR: [*/+\-]'=' ;
 
-IDENTIFIER: [a-zA-Z] [a-zA-Z1-9]* ;
+IDENTIFIER: [a-zA-Z] [a-zA-Z0-9]* ;
 
 SEMI: ';';
 
@@ -271,7 +273,7 @@ false_literal
     ;
     
 numeric_literal
-    : INT
+    : INTEGER
     ;
     
 string_literal
