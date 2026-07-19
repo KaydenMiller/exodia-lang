@@ -122,7 +122,7 @@ member
     ;
     
 method_declaration
-    : identifier '(' formal_parameter_list? ')' COLON type block_statement
+    : identifier type_parameters? '(' formal_parameter_list? ')' COLON type block_statement
     ;
     
 constructor_declaration
@@ -134,11 +134,11 @@ field_declaration
     ;
     
 class_declaration
-    : accessability_modifier* CLASS identifier class_extends? '{' member* '}'
+    : accessability_modifier* CLASS identifier type_parameters? class_extends? '{' member* '}'
     ;
     
 struct_declaration
-    : accessability_modifier* STRUCT identifier '{' member* '}'
+    : accessability_modifier* STRUCT identifier type_parameters? '{' member* '}'
     ;
     
 class_extends
@@ -200,7 +200,7 @@ block_statement
 // FUNCTIONS
 
 function_declaration
-    : accessability_modifier* FN identifier '(' formal_parameter_list? ')' COLON type block_statement
+    : accessability_modifier* FN identifier type_parameters? '(' formal_parameter_list? ')' COLON type block_statement
     ;
    
 formal_parameter
@@ -339,7 +339,16 @@ qualified_name
     ;
     
 type
-    : qualified_name ('[' ']')* ;
+    : qualified_name type_arguments? ('[' ']')* 
+    ;
+
+type_arguments
+    : LT type (',' type)* GT
+    ;
+    
+type_parameters
+    : LT identifier (',' identifier)* GT
+    ;
     
 // LITERALS
 

@@ -592,6 +592,26 @@ public interface IExodiaListener : IParseTreeListener {
 	/// <param name="context">The parse tree.</param>
 	void ExitType([NotNull] ExodiaParser.TypeContext context);
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.type_arguments"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterType_arguments([NotNull] ExodiaParser.Type_argumentsContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.type_arguments"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitType_arguments([NotNull] ExodiaParser.Type_argumentsContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.type_parameters"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterType_parameters([NotNull] ExodiaParser.Type_parametersContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.type_parameters"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitType_parameters([NotNull] ExodiaParser.Type_parametersContext context);
+	/// <summary>
 	/// Enter a parse tree produced by the <c>atom</c>
 	/// labeled alternative in <see cref="ExodiaParser.literal"/>.
 	/// </summary>

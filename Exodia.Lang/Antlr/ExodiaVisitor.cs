@@ -369,6 +369,18 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitType([NotNull] ExodiaParser.TypeContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.type_arguments"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitType_arguments([NotNull] ExodiaParser.Type_argumentsContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.type_parameters"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitType_parameters([NotNull] ExodiaParser.Type_parametersContext context);
+	/// <summary>
 	/// Visit a parse tree produced by the <c>atom</c>
 	/// labeled alternative in <see cref="ExodiaParser.literal"/>.
 	/// </summary>

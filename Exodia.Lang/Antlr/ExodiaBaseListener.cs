@@ -709,6 +709,30 @@ public partial class ExodiaBaseListener : IExodiaListener {
 	/// <param name="context">The parse tree.</param>
 	public virtual void ExitType([NotNull] ExodiaParser.TypeContext context) { }
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.type_arguments"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterType_arguments([NotNull] ExodiaParser.Type_argumentsContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.type_arguments"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitType_arguments([NotNull] ExodiaParser.Type_argumentsContext context) { }
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.type_parameters"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterType_parameters([NotNull] ExodiaParser.Type_parametersContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.type_parameters"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitType_parameters([NotNull] ExodiaParser.Type_parametersContext context) { }
+	/// <summary>
 	/// Enter a parse tree produced by the <c>atom</c>
 	/// labeled alternative in <see cref="ExodiaParser.literal"/>.
 	/// <para>The default implementation does nothing.</para>
