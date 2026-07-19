@@ -279,6 +279,18 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitRelational_expression([NotNull] ExodiaParser.Relational_expressionContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.shift_expression"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitShift_expression([NotNull] ExodiaParser.Shift_expressionContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.shift_operator"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitShift_operator([NotNull] ExodiaParser.Shift_operatorContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.additive_expression"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>

@@ -442,6 +442,26 @@ public interface IExodiaListener : IParseTreeListener {
 	/// <param name="context">The parse tree.</param>
 	void ExitRelational_expression([NotNull] ExodiaParser.Relational_expressionContext context);
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.shift_expression"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterShift_expression([NotNull] ExodiaParser.Shift_expressionContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.shift_expression"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitShift_expression([NotNull] ExodiaParser.Shift_expressionContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.shift_operator"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterShift_operator([NotNull] ExodiaParser.Shift_operatorContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.shift_operator"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitShift_operator([NotNull] ExodiaParser.Shift_operatorContext context);
+	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.additive_expression"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>

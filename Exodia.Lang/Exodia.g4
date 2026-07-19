@@ -53,11 +53,15 @@ fragment MUL: '*';
 fragment DIV: '/';
 MULTIPLICATIVE_OPERATOR: MUL | DIV ;
 
+LT: '<' ; 
+GT: '>' ;
+LE: '<=' ;
+GE: '>=' ;
+
 COLONCOLON: '::' ;
 
 COLON: ':' ;
 EQUALITY_OPERATOR: [=!]'=' ;
-RELATIONAL_OPERATOR: [><]'='? ;
 LOGICAL_OR: '||' ;
 LOGICAL_AND: '&&' ;
 
@@ -262,8 +266,18 @@ equality_expression
     ;
     
 relational_expression
+    : shift_expression
+    | left=relational_expression op=(LT | GT | LE | GE) right=shift_expression
+    ;
+    
+shift_expression
     : additive_expression
-    | left=relational_expression op=RELATIONAL_OPERATOR right=additive_expression
+    | left=shift_expression op=shift_operator right=additive_expression
+    ;
+    
+shift_operator
+    : LT LT 
+    | GT GT
     ;
     
 additive_expression

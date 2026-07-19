@@ -529,6 +529,30 @@ public partial class ExodiaBaseListener : IExodiaListener {
 	/// <param name="context">The parse tree.</param>
 	public virtual void ExitRelational_expression([NotNull] ExodiaParser.Relational_expressionContext context) { }
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.shift_expression"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterShift_expression([NotNull] ExodiaParser.Shift_expressionContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.shift_expression"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitShift_expression([NotNull] ExodiaParser.Shift_expressionContext context) { }
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.shift_operator"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterShift_operator([NotNull] ExodiaParser.Shift_operatorContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.shift_operator"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitShift_operator([NotNull] ExodiaParser.Shift_operatorContext context) { }
+	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.additive_expression"/>.
 	/// <para>The default implementation does nothing.</para>
 	/// </summary>
