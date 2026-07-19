@@ -18,6 +18,7 @@ DO: 'do' ;
 FOR: 'for' ;
 STRUCT: 'struct' ;
 CLASS: 'class' ;
+ENUM: 'enum' ;
 NAMESPACE: 'namespace' ;
 EXTENDS: 'extends' ;
 THIS: 'this' ;
@@ -89,6 +90,7 @@ statement
     | iteration_statement
     | class_declaration
     | struct_declaration
+    | enum_declaration
     | namespace_declaration
     ;
     
@@ -104,6 +106,7 @@ namespace_member
     : struct_declaration
     | class_declaration
     | function_declaration
+    | enum_declaration
     | namespace_declaration
     ;
     
@@ -135,6 +138,22 @@ field_declaration
     
 class_declaration
     : accessability_modifier* CLASS identifier type_parameters? class_extends? '{' member* '}'
+    ;
+
+enum_declaration
+    : accessability_modifier* ENUM identifier type_parameters? '{' enum_variant_list? '}'
+    ;
+    
+enum_variant_list
+    : enum_variant (',' enum_variant)* ','?
+    ;   
+    
+enum_variant
+    : identifier enum_variant_payload?
+    ;
+    
+enum_variant_payload
+    : '(' type (',' type)* ')'
     ;
     
 struct_declaration

@@ -152,6 +152,46 @@ public interface IExodiaListener : IParseTreeListener {
 	/// <param name="context">The parse tree.</param>
 	void ExitClass_declaration([NotNull] ExodiaParser.Class_declarationContext context);
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.enum_declaration"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterEnum_declaration([NotNull] ExodiaParser.Enum_declarationContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.enum_declaration"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitEnum_declaration([NotNull] ExodiaParser.Enum_declarationContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.enum_variant_list"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterEnum_variant_list([NotNull] ExodiaParser.Enum_variant_listContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.enum_variant_list"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitEnum_variant_list([NotNull] ExodiaParser.Enum_variant_listContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.enum_variant"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterEnum_variant([NotNull] ExodiaParser.Enum_variantContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.enum_variant"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitEnum_variant([NotNull] ExodiaParser.Enum_variantContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.enum_variant_payload"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterEnum_variant_payload([NotNull] ExodiaParser.Enum_variant_payloadContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.enum_variant_payload"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitEnum_variant_payload([NotNull] ExodiaParser.Enum_variant_payloadContext context);
+	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.struct_declaration"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>

@@ -105,6 +105,30 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitClass_declaration([NotNull] ExodiaParser.Class_declarationContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.enum_declaration"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitEnum_declaration([NotNull] ExodiaParser.Enum_declarationContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.enum_variant_list"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitEnum_variant_list([NotNull] ExodiaParser.Enum_variant_listContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.enum_variant"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitEnum_variant([NotNull] ExodiaParser.Enum_variantContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.enum_variant_payload"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitEnum_variant_payload([NotNull] ExodiaParser.Enum_variant_payloadContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.struct_declaration"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
