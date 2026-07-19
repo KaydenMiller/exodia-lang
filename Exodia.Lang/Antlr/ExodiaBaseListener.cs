@@ -145,18 +145,6 @@ public partial class ExodiaBaseListener : IExodiaListener {
 	/// <param name="context">The parse tree.</param>
 	public virtual void ExitVariable_statement([NotNull] ExodiaParser.Variable_statementContext context) { }
 	/// <summary>
-	/// Enter a parse tree produced by <see cref="ExodiaParser.variable_declaration_list"/>.
-	/// <para>The default implementation does nothing.</para>
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	public virtual void EnterVariable_declaration_list([NotNull] ExodiaParser.Variable_declaration_listContext context) { }
-	/// <summary>
-	/// Exit a parse tree produced by <see cref="ExodiaParser.variable_declaration_list"/>.
-	/// <para>The default implementation does nothing.</para>
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	public virtual void ExitVariable_declaration_list([NotNull] ExodiaParser.Variable_declaration_listContext context) { }
-	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.variable_declaration"/>.
 	/// <para>The default implementation does nothing.</para>
 	/// </summary>
@@ -168,6 +156,18 @@ public partial class ExodiaBaseListener : IExodiaListener {
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	public virtual void ExitVariable_declaration([NotNull] ExodiaParser.Variable_declarationContext context) { }
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.variable_declaration_list"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterVariable_declaration_list([NotNull] ExodiaParser.Variable_declaration_listContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.variable_declaration_list"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitVariable_declaration_list([NotNull] ExodiaParser.Variable_declaration_listContext context) { }
 	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.variable_initializer"/>.
 	/// <para>The default implementation does nothing.</para>
@@ -240,6 +240,18 @@ public partial class ExodiaBaseListener : IExodiaListener {
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	public virtual void ExitFunction_declaration([NotNull] ExodiaParser.Function_declarationContext context) { }
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.formal_parameter"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterFormal_parameter([NotNull] ExodiaParser.Formal_parameterContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.formal_parameter"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitFormal_parameter([NotNull] ExodiaParser.Formal_parameterContext context) { }
 	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.formal_parameter_list"/>.
 	/// <para>The default implementation does nothing.</para>
@@ -528,6 +540,30 @@ public partial class ExodiaBaseListener : IExodiaListener {
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	public virtual void ExitParenthesized_expression([NotNull] ExodiaParser.Parenthesized_expressionContext context) { }
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.qualified_name"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterQualified_name([NotNull] ExodiaParser.Qualified_nameContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.qualified_name"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitQualified_name([NotNull] ExodiaParser.Qualified_nameContext context) { }
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.type"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterType([NotNull] ExodiaParser.TypeContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.type"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitType([NotNull] ExodiaParser.TypeContext context) { }
 	/// <summary>
 	/// Enter a parse tree produced by the <c>atom</c>
 	/// labeled alternative in <see cref="ExodiaParser.literal"/>.

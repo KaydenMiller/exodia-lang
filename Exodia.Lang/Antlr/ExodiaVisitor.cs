@@ -87,17 +87,17 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitVariable_statement([NotNull] ExodiaParser.Variable_statementContext context);
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="ExodiaParser.variable_declaration_list"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitVariable_declaration_list([NotNull] ExodiaParser.Variable_declaration_listContext context);
-	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.variable_declaration"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitVariable_declaration([NotNull] ExodiaParser.Variable_declarationContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.variable_declaration_list"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitVariable_declaration_list([NotNull] ExodiaParser.Variable_declaration_listContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.variable_initializer"/>.
 	/// </summary>
@@ -134,6 +134,12 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitFunction_declaration([NotNull] ExodiaParser.Function_declarationContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.formal_parameter"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitFormal_parameter([NotNull] ExodiaParser.Formal_parameterContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.formal_parameter_list"/>.
 	/// </summary>
@@ -278,6 +284,18 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitParenthesized_expression([NotNull] ExodiaParser.Parenthesized_expressionContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.qualified_name"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitQualified_name([NotNull] ExodiaParser.Qualified_nameContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.type"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitType([NotNull] ExodiaParser.TypeContext context);
 	/// <summary>
 	/// Visit a parse tree produced by the <c>atom</c>
 	/// labeled alternative in <see cref="ExodiaParser.literal"/>.

@@ -7,7 +7,8 @@ SINGLE_COMMENT: '//' ~[\r\n]* -> channel(HIDDEN);
 BLOCK_COMMENT: '/*' .*? '*/' -> channel(HIDDEN);
 
 // KEYWORDS
-LET: 'let' ;
+MUT: 'mut' ;
+CONST: 'const' ;
 RETURN: 'return' ;
 FN: 'fn' ;
 IF: 'if' ;
@@ -41,6 +42,9 @@ fragment MUL: '*';
 fragment DIV: '/';
 MULTIPLICATIVE_OPERATOR: MUL | DIV ;
 
+COLONCOLON: '::' ;
+
+COLON: ':' ;
 EQUALITY_OPERATOR: [=!]'=' ;
 RELATIONAL_OPERATOR: [><]'='? ;
 LOGICAL_OR: '||' ;
@@ -98,16 +102,16 @@ while_statement
     ;
     
 variable_statement
-    : LET variable_declaration_list SEMI 
+    : (CONST | MUT) variable_declaration_list SEMI 
+    ;
+    
+variable_declaration
+    : identifier (COLON type)? variable_initializer? 
     ;
 
 variable_declaration_list
     : variable_declaration
     | variable_declaration_list ',' variable_declaration 
-    ;
-   
-variable_declaration
-    : identifier variable_initializer? 
     ;
 
 variable_initializer
@@ -134,12 +138,15 @@ block_statement
 // FUNCTIONS
 
 function_declaration
-    : FN identifier '(' formal_parameter_list? ')' block_statement
+    : FN identifier '(' formal_parameter_list? ')' COLON type block_statement
+    ;
+   
+formal_parameter
+    : identifier COLON type
     ;
 
 formal_parameter_list
-    : identifier
-    | formal_parameter_list ',' identifier
+    : formal_parameter (',' formal_parameter)* 
     ;
     
 // EXPRESSIONS
@@ -167,7 +174,7 @@ left_hand_side_expression
     ;
     
 member_expression
-    : identifier
+    : qualified_name
     | this_expression
     | member_expression '.' identifier
     | member_expression '[' expression ']'
@@ -254,6 +261,13 @@ primary_expression
 parenthesized_expression
     : '(' expression ')'
     ;
+    
+qualified_name
+    : identifier (COLONCOLON identifier)* 
+    ;
+    
+type
+    : qualified_name ('[' ']')* ;
     
 // LITERALS
 
