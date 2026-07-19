@@ -61,6 +61,42 @@ public partial class ExodiaBaseListener : IExodiaListener {
 	/// <param name="context">The parse tree.</param>
 	public virtual void ExitStatement([NotNull] ExodiaParser.StatementContext context) { }
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.accessability_modifier"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterAccessability_modifier([NotNull] ExodiaParser.Accessability_modifierContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.accessability_modifier"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitAccessability_modifier([NotNull] ExodiaParser.Accessability_modifierContext context) { }
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.mut_flag"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterMut_flag([NotNull] ExodiaParser.Mut_flagContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.mut_flag"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitMut_flag([NotNull] ExodiaParser.Mut_flagContext context) { }
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.member_kind"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterMember_kind([NotNull] ExodiaParser.Member_kindContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.member_kind"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitMember_kind([NotNull] ExodiaParser.Member_kindContext context) { }
+	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.member"/>.
 	/// <para>The default implementation does nothing.</para>
 	/// </summary>
@@ -72,6 +108,30 @@ public partial class ExodiaBaseListener : IExodiaListener {
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	public virtual void ExitMember([NotNull] ExodiaParser.MemberContext context) { }
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.method_declaration"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterMethod_declaration([NotNull] ExodiaParser.Method_declarationContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.method_declaration"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitMethod_declaration([NotNull] ExodiaParser.Method_declarationContext context) { }
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.constructor_declaration"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterConstructor_declaration([NotNull] ExodiaParser.Constructor_declarationContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.constructor_declaration"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitConstructor_declaration([NotNull] ExodiaParser.Constructor_declarationContext context) { }
 	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.field_declaration"/>.
 	/// <para>The default implementation does nothing.</para>

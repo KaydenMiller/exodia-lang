@@ -23,6 +23,15 @@ THIS: 'this' ;
 SUPER: 'super';
 NEW: 'new' ;
 
+CONSTRUCTOR: 'ctor';
+
+PUBLIC: 'public' ;
+PRIVATE: 'private' ;
+PROTECTED: 'protected' ;
+INTERNAL: 'internal' ;
+GLOBAL: 'global' ;
+STATIC: 'static' ;
+
 WHITESPACE: [ \t\n\r\f]+ -> skip ;
 
 fragment DIGITS : [0-9] ( [0-9_]* [0-9] )? ;
@@ -77,20 +86,42 @@ statement
     | struct_declaration
     ;
     
-member
-    : field_declaration
+accessability_modifier
+    : PUBLIC | PRIVATE | INTERNAL | PROTECTED | GLOBAL | STATIC
     ;
     
+mut_flag
+    : MUT
+    ;
+    
+member_kind
+    : mut_flag? field_declaration
+    | method_declaration
+    | constructor_declaration
+    ;
+    
+member
+    : accessability_modifier* member_kind
+    ;
+    
+method_declaration
+    : identifier '(' formal_parameter_list? ')' COLON type block_statement
+    ;
+    
+constructor_declaration
+    : CONSTRUCTOR identifier? '(' formal_parameter_list? ')' block_statement
+    ;
+   
 field_declaration
     : identifier COLON type SEMI
     ;
     
 class_declaration
-    : CLASS identifier class_extends? '{' member* '}'
+    : accessability_modifier* CLASS identifier class_extends? '{' member* '}'
     ;
     
 struct_declaration
-    : STRUCT identifier '{' member* '}'
+    : accessability_modifier* STRUCT identifier '{' member* '}'
     ;
     
 class_extends

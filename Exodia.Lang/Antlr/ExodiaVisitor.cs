@@ -45,11 +45,41 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitStatement([NotNull] ExodiaParser.StatementContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.accessability_modifier"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitAccessability_modifier([NotNull] ExodiaParser.Accessability_modifierContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.mut_flag"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitMut_flag([NotNull] ExodiaParser.Mut_flagContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.member_kind"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitMember_kind([NotNull] ExodiaParser.Member_kindContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.member"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitMember([NotNull] ExodiaParser.MemberContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.method_declaration"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitMethod_declaration([NotNull] ExodiaParser.Method_declarationContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.constructor_declaration"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitConstructor_declaration([NotNull] ExodiaParser.Constructor_declarationContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.field_declaration"/>.
 	/// </summary>

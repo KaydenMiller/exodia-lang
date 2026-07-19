@@ -52,6 +52,36 @@ public interface IExodiaListener : IParseTreeListener {
 	/// <param name="context">The parse tree.</param>
 	void ExitStatement([NotNull] ExodiaParser.StatementContext context);
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.accessability_modifier"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterAccessability_modifier([NotNull] ExodiaParser.Accessability_modifierContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.accessability_modifier"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitAccessability_modifier([NotNull] ExodiaParser.Accessability_modifierContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.mut_flag"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterMut_flag([NotNull] ExodiaParser.Mut_flagContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.mut_flag"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitMut_flag([NotNull] ExodiaParser.Mut_flagContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.member_kind"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterMember_kind([NotNull] ExodiaParser.Member_kindContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.member_kind"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitMember_kind([NotNull] ExodiaParser.Member_kindContext context);
+	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.member"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
@@ -61,6 +91,26 @@ public interface IExodiaListener : IParseTreeListener {
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	void ExitMember([NotNull] ExodiaParser.MemberContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.method_declaration"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterMethod_declaration([NotNull] ExodiaParser.Method_declarationContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.method_declaration"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitMethod_declaration([NotNull] ExodiaParser.Method_declarationContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.constructor_declaration"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterConstructor_declaration([NotNull] ExodiaParser.Constructor_declarationContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.constructor_declaration"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitConstructor_declaration([NotNull] ExodiaParser.Constructor_declarationContext context);
 	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.field_declaration"/>.
 	/// </summary>
