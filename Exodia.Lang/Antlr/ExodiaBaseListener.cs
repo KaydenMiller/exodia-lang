@@ -73,6 +73,30 @@ public partial class ExodiaBaseListener : IExodiaListener {
 	/// <param name="context">The parse tree.</param>
 	public virtual void ExitClass_declaration([NotNull] ExodiaParser.Class_declarationContext context) { }
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.struct_declaration"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterStruct_declaration([NotNull] ExodiaParser.Struct_declarationContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.struct_declaration"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitStruct_declaration([NotNull] ExodiaParser.Struct_declarationContext context) { }
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.field_declaration"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterField_declaration([NotNull] ExodiaParser.Field_declarationContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.field_declaration"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitField_declaration([NotNull] ExodiaParser.Field_declarationContext context) { }
+	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.class_extends"/>.
 	/// <para>The default implementation does nothing.</para>
 	/// </summary>

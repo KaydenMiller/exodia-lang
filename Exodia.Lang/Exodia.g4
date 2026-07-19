@@ -16,6 +16,7 @@ ELSE: 'else' ;
 WHILE: 'while' ;
 DO: 'do' ;
 FOR: 'for' ;
+STRUCT: 'struct' ;
 CLASS: 'class' ;
 EXTENDS: 'extends' ;
 THIS: 'this' ;
@@ -73,10 +74,19 @@ statement
     | if_statement
     | iteration_statement
     | class_declaration
+    | struct_declaration
     ;
     
 class_declaration
     : CLASS identifier class_extends? statement
+    ;
+    
+struct_declaration
+    : STRUCT identifier '{' field_declaration* '}'
+    ;
+    
+field_declaration
+    : identifier COLON type SEMI
     ;
     
 class_extends
