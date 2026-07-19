@@ -52,6 +52,26 @@ public interface IExodiaListener : IParseTreeListener {
 	/// <param name="context">The parse tree.</param>
 	void ExitStatement([NotNull] ExodiaParser.StatementContext context);
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.member"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterMember([NotNull] ExodiaParser.MemberContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.member"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitMember([NotNull] ExodiaParser.MemberContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.field_declaration"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterField_declaration([NotNull] ExodiaParser.Field_declarationContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.field_declaration"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitField_declaration([NotNull] ExodiaParser.Field_declarationContext context);
+	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.class_declaration"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
@@ -71,16 +91,6 @@ public interface IExodiaListener : IParseTreeListener {
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	void ExitStruct_declaration([NotNull] ExodiaParser.Struct_declarationContext context);
-	/// <summary>
-	/// Enter a parse tree produced by <see cref="ExodiaParser.field_declaration"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	void EnterField_declaration([NotNull] ExodiaParser.Field_declarationContext context);
-	/// <summary>
-	/// Exit a parse tree produced by <see cref="ExodiaParser.field_declaration"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	void ExitField_declaration([NotNull] ExodiaParser.Field_declarationContext context);
 	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.class_extends"/>.
 	/// </summary>

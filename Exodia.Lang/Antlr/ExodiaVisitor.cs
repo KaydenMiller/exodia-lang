@@ -45,6 +45,18 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitStatement([NotNull] ExodiaParser.StatementContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.member"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitMember([NotNull] ExodiaParser.MemberContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.field_declaration"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitField_declaration([NotNull] ExodiaParser.Field_declarationContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.class_declaration"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
@@ -56,12 +68,6 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitStruct_declaration([NotNull] ExodiaParser.Struct_declarationContext context);
-	/// <summary>
-	/// Visit a parse tree produced by <see cref="ExodiaParser.field_declaration"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitField_declaration([NotNull] ExodiaParser.Field_declarationContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.class_extends"/>.
 	/// </summary>

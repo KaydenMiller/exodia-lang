@@ -77,20 +77,24 @@ statement
     | struct_declaration
     ;
     
-class_declaration
-    : CLASS identifier class_extends? statement
-    ;
-    
-struct_declaration
-    : STRUCT identifier '{' field_declaration* '}'
+member
+    : field_declaration
     ;
     
 field_declaration
     : identifier COLON type SEMI
     ;
     
+class_declaration
+    : CLASS identifier class_extends? '{' member* '}'
+    ;
+    
+struct_declaration
+    : STRUCT identifier '{' member* '}'
+    ;
+    
 class_extends
-    : EXTENDS identifier
+    : EXTENDS qualified_name
     ;
     
 iteration_statement
