@@ -18,6 +18,7 @@ DO: 'do' ;
 FOR: 'for' ;
 STRUCT: 'struct' ;
 CLASS: 'class' ;
+NAMESPACE: 'namespace' ;
 EXTENDS: 'extends' ;
 THIS: 'this' ;
 SUPER: 'super';
@@ -84,6 +85,7 @@ statement
     | iteration_statement
     | class_declaration
     | struct_declaration
+    | namespace_declaration
     ;
     
 accessability_modifier
@@ -92,6 +94,17 @@ accessability_modifier
     
 mut_flag
     : MUT
+    ;
+    
+namespace_member
+    : struct_declaration
+    | class_declaration
+    | function_declaration
+    | namespace_declaration
+    ;
+    
+namespace_declaration
+    : NAMESPACE qualified_name '{' namespace_member* '}'
     ;
     
 member_kind
@@ -183,7 +196,7 @@ block_statement
 // FUNCTIONS
 
 function_declaration
-    : FN identifier '(' formal_parameter_list? ')' COLON type block_statement
+    : accessability_modifier* FN identifier '(' formal_parameter_list? ')' COLON type block_statement
     ;
    
 formal_parameter

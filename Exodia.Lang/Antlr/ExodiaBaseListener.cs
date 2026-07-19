@@ -85,6 +85,30 @@ public partial class ExodiaBaseListener : IExodiaListener {
 	/// <param name="context">The parse tree.</param>
 	public virtual void ExitMut_flag([NotNull] ExodiaParser.Mut_flagContext context) { }
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.namespace_member"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterNamespace_member([NotNull] ExodiaParser.Namespace_memberContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.namespace_member"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitNamespace_member([NotNull] ExodiaParser.Namespace_memberContext context) { }
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.namespace_declaration"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterNamespace_declaration([NotNull] ExodiaParser.Namespace_declarationContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.namespace_declaration"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitNamespace_declaration([NotNull] ExodiaParser.Namespace_declarationContext context) { }
+	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.member_kind"/>.
 	/// <para>The default implementation does nothing.</para>
 	/// </summary>

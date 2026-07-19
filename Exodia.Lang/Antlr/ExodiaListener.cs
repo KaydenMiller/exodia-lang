@@ -72,6 +72,26 @@ public interface IExodiaListener : IParseTreeListener {
 	/// <param name="context">The parse tree.</param>
 	void ExitMut_flag([NotNull] ExodiaParser.Mut_flagContext context);
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.namespace_member"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterNamespace_member([NotNull] ExodiaParser.Namespace_memberContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.namespace_member"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitNamespace_member([NotNull] ExodiaParser.Namespace_memberContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.namespace_declaration"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterNamespace_declaration([NotNull] ExodiaParser.Namespace_declarationContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.namespace_declaration"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitNamespace_declaration([NotNull] ExodiaParser.Namespace_declarationContext context);
+	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.member_kind"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>

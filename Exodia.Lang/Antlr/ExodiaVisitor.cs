@@ -57,6 +57,18 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitMut_flag([NotNull] ExodiaParser.Mut_flagContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.namespace_member"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitNamespace_member([NotNull] ExodiaParser.Namespace_memberContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.namespace_declaration"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitNamespace_declaration([NotNull] ExodiaParser.Namespace_declarationContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.member_kind"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
