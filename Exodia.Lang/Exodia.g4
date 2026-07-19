@@ -149,7 +149,7 @@ expression_statement
     ;
     
 expression
-    :  additive_expression
+    :  assignment_expression
     ;
     
 assignment_expression
@@ -274,6 +274,7 @@ false_literal
     
 numeric_literal
     : INTEGER
+    | FLOAT
     ;
     
 string_literal
