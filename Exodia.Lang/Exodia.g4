@@ -24,6 +24,8 @@ EXTENDS: 'extends' ;
 THIS: 'this' ;
 SUPER: 'super';
 NEW: 'new' ;
+MATCH: 'match' ;
+WHEN: 'when' ;
 
 CONSTRUCTOR: 'ctor';
 
@@ -59,6 +61,10 @@ GT: '>' ;
 LE: '<=' ;
 GE: '>=' ;
 
+FATARROW: '=>' ;
+PIPE: '|' ;
+DOTDOT: '..' ;
+
 COLONCOLON: '::' ;
 
 COLON: ':' ;
@@ -69,7 +75,18 @@ LOGICAL_AND: '&&' ;
 SIMPLE_ASSIGNMENT_OPERATOR: [=] ;
 COMPLEX_ASSIGMENT_OPERATOR: [*/+\-]'=' ;
 
-IDENTIFIER: [a-zA-Z] [a-zA-Z0-9]* ;
+IDENTIFIER
+    : '@'? IdentifierStart IdentifierPart*
+    ;
+
+fragment IdentifierStart
+    : [\p{L}\p{Nl}] // letters + letter-numbers
+    | '_'
+    ;
+    
+fragment IdentifierPart
+    : [\p{L}\p{Nl}\p{Mn}\p{Mc}\p{Nd}\p{Pc}\p{Cf}]
+    ;
 
 SEMI: ';';
 
@@ -342,11 +359,39 @@ new_expression
     : NEW exp=member_expression args=arguments
     ;
     
+match_expression
+    : MATCH expression '{' match_arm (',' match_arm)* ','? '}'
+    ;
+    
+match_arm
+    : pattern (WHEN expression)? FATARROW arm_body
+    ;
+    
+arm_body
+    : expression
+    | block_statement
+    ;
+    
+pattern
+    : primary_pattern (PIPE primary_pattern)*
+    ;
+    
+primary_pattern
+    : qualified_name pattern_payload?
+    | literal (DOTDOT literal)?
+    | '_'
+    ;
+    
+pattern_payload
+    : '(' pattern (',' pattern)* ')'
+    ;
+    
 primary_expression
     : literal
     | member_expression
     | parenthesized_expression
     | new_expression
+    | match_expression
     ;
     
 parenthesized_expression

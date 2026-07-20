@@ -709,6 +709,78 @@ public partial class ExodiaBaseListener : IExodiaListener {
 	/// <param name="context">The parse tree.</param>
 	public virtual void ExitNew_expression([NotNull] ExodiaParser.New_expressionContext context) { }
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.match_expression"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterMatch_expression([NotNull] ExodiaParser.Match_expressionContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.match_expression"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitMatch_expression([NotNull] ExodiaParser.Match_expressionContext context) { }
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.match_arm"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterMatch_arm([NotNull] ExodiaParser.Match_armContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.match_arm"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitMatch_arm([NotNull] ExodiaParser.Match_armContext context) { }
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.arm_body"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterArm_body([NotNull] ExodiaParser.Arm_bodyContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.arm_body"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitArm_body([NotNull] ExodiaParser.Arm_bodyContext context) { }
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.pattern"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterPattern([NotNull] ExodiaParser.PatternContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.pattern"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitPattern([NotNull] ExodiaParser.PatternContext context) { }
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.primary_pattern"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterPrimary_pattern([NotNull] ExodiaParser.Primary_patternContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.primary_pattern"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitPrimary_pattern([NotNull] ExodiaParser.Primary_patternContext context) { }
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.pattern_payload"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterPattern_payload([NotNull] ExodiaParser.Pattern_payloadContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.pattern_payload"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitPattern_payload([NotNull] ExodiaParser.Pattern_payloadContext context) { }
+	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.primary_expression"/>.
 	/// <para>The default implementation does nothing.</para>
 	/// </summary>

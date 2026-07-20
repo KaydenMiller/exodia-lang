@@ -369,6 +369,42 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitNew_expression([NotNull] ExodiaParser.New_expressionContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.match_expression"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitMatch_expression([NotNull] ExodiaParser.Match_expressionContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.match_arm"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitMatch_arm([NotNull] ExodiaParser.Match_armContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.arm_body"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitArm_body([NotNull] ExodiaParser.Arm_bodyContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.pattern"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitPattern([NotNull] ExodiaParser.PatternContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.primary_pattern"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitPrimary_pattern([NotNull] ExodiaParser.Primary_patternContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.pattern_payload"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitPattern_payload([NotNull] ExodiaParser.Pattern_payloadContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.primary_expression"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>

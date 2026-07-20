@@ -592,6 +592,66 @@ public interface IExodiaListener : IParseTreeListener {
 	/// <param name="context">The parse tree.</param>
 	void ExitNew_expression([NotNull] ExodiaParser.New_expressionContext context);
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.match_expression"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterMatch_expression([NotNull] ExodiaParser.Match_expressionContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.match_expression"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitMatch_expression([NotNull] ExodiaParser.Match_expressionContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.match_arm"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterMatch_arm([NotNull] ExodiaParser.Match_armContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.match_arm"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitMatch_arm([NotNull] ExodiaParser.Match_armContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.arm_body"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterArm_body([NotNull] ExodiaParser.Arm_bodyContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.arm_body"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitArm_body([NotNull] ExodiaParser.Arm_bodyContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.pattern"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterPattern([NotNull] ExodiaParser.PatternContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.pattern"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitPattern([NotNull] ExodiaParser.PatternContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.primary_pattern"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterPrimary_pattern([NotNull] ExodiaParser.Primary_patternContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.primary_pattern"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitPrimary_pattern([NotNull] ExodiaParser.Primary_patternContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.pattern_payload"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterPattern_payload([NotNull] ExodiaParser.Pattern_payloadContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.pattern_payload"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitPattern_payload([NotNull] ExodiaParser.Pattern_payloadContext context);
+	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.primary_expression"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
