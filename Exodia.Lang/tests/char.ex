@@ -9,28 +9,28 @@
 //   - empty '' or multi-char 'ab'  (CHAR requires exactly one char or one escape)
 
 // --- plain single characters: letter, digit, symbol, space ---
-const letter: Char = 'a';
-const digit:  Char = '7';
-const symbol: Char = ':';
-const space:  Char = ' ';
-const quote2: Char = '"';   // a bare double-quote needs no escape inside single quotes
+const letter: char = 'a';
+const digit:  char = '7';
+const symbol: char = ':';
+const space:  char = ' ';
+const quote2: char = '"';   // a bare double-quote needs no escape inside single quotes
 
 // --- every escape in the ESCAPE fragment ---
-const escQuote: Char = '\'';   // escaped single quote
-const escDbl:   Char = '\"';   // escaped double quote
-const escSlash: Char = '\\';   // backslash
-const escNull:  Char = '\0';   // NUL
-const escNL:    Char = '\n';   // newline
-const escCR:    Char = '\r';   // carriage return
-const escTab:   Char = '\t';   // tab
+const escQuote: char = '\'';   // escaped single quote
+const escDbl:   char = '\"';   // escaped double quote
+const escSlash: char = '\\';   // backslash
+const escNull:  char = '\0';   // NUL
+const escNL:    char = '\n';   // newline
+const escCR:    char = '\r';   // carriage return
+const escTab:   char = '\t';   // tab
 
 // --- Unicode BMP characters (the ~['\\\r\n] class accepts any single code point) ---
-const cjk:    Char = '中';
-const accent: Char = 'é';
-const greek:  Char = 'Ω';
+const cjk:    char = '中';
+const accent: char = 'é';
+const greek:  char = 'Ω';
 
 // --- char in expression positions: comparison, argument, return ---
-fn isColon(c: Char): int32 {
+fn isColon(c: char): int32 {
     if (c == ':') {
         return 1;
     }
@@ -42,7 +42,7 @@ fn firstDelimiter(input: String): uint16 {
 }
 
 // --- char literals as MATCH patterns: literal, OR, and ranges ('a'..'z') ---
-fn classify(c: Char): int32 {
+fn classify(c: char): int32 {
     return match c {
         '0'..'9'          => 1,   // char range
         'a'..'z'          => 2,

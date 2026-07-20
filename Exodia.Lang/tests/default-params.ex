@@ -11,7 +11,7 @@ fn config(
     retries: int32  = 3,
     label:   String = "default",
     enabled: bool   = true,
-    sep:     Char   = ',',
+    sep:     char   = ',',
     rate:    double = 1.5): int32 {
     return retries;
 }

@@ -28,7 +28,7 @@ fn shapes(): int32 {
 
     // --- non-numeric element types ---
     const words: String[] = ["a", "b", "c"];
-    const chars: Char[]   = ['x', ',', '\n'];
+    const chars: char[]   = ['x', ',', '\n'];
 
     // --- array literal as a call argument ---
     Sum([10, 20, 30]);
