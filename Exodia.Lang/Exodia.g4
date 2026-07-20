@@ -145,7 +145,7 @@ member
     ;
     
 method_declaration
-    : identifier type_parameters? '(' formal_parameter_list? ')' COLON type block_statement
+    : identifier type_parameters? '(' formal_parameter_list? ')' COLON type function_body
     ;
     
 constructor_declaration
@@ -239,7 +239,12 @@ block_statement
 // FUNCTIONS
 
 function_declaration
-    : accessability_modifier* FN identifier type_parameters? '(' formal_parameter_list? ')' COLON type block_statement
+    : accessability_modifier* FN identifier type_parameters? '(' formal_parameter_list? ')' COLON type function_body
+    ;
+
+function_body
+    : block_statement
+    | FATARROW expression SEMI
     ;
    
 formal_parameter

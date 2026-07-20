@@ -342,6 +342,16 @@ public interface IExodiaListener : IParseTreeListener {
 	/// <param name="context">The parse tree.</param>
 	void ExitFunction_declaration([NotNull] ExodiaParser.Function_declarationContext context);
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.function_body"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterFunction_body([NotNull] ExodiaParser.Function_bodyContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.function_body"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitFunction_body([NotNull] ExodiaParser.Function_bodyContext context);
+	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.formal_parameter"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
