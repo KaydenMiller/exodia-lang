@@ -394,6 +394,7 @@ primary_expression
     | parenthesized_expression
     | new_expression
     | match_expression
+    | array_literal
     ;
     
 parenthesized_expression
@@ -424,6 +425,10 @@ literal
     | char_literal          #atom
     | true_literal          #atom
     | false_literal         #atom
+    ;
+    
+array_literal
+    : '[' (expression (',' expression)* ','?)? ']'
     ;
     
 char_literal
