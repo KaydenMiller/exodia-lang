@@ -107,6 +107,7 @@ statement
     | variable_statement
     | if_statement
     | iteration_statement
+    | match_expression
     | class_declaration
     | struct_declaration
     | enum_declaration
