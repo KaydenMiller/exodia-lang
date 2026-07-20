@@ -26,6 +26,7 @@ SUPER: 'super';
 NEW: 'new' ;
 MATCH: 'match' ;
 WHEN: 'when' ;
+THROW: 'throw' ;
 CHAR: '\'' ( ~['\\\r\n] | ESCAPE ) '\'' ;
 fragment ESCAPE: '\\' ['"\\0nrt] ; // \' \" \\ \0 \n \r \t
 
@@ -260,9 +261,14 @@ formal_parameter_list
 expression_statement
     : expression SEMI 
     ;
+
+throw_expression
+    : THROW expression
+    ;
     
 expression
     :  assignment_expression
+    | throw_expression
     ;
     
 assignment_expression

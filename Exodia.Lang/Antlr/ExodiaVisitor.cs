@@ -243,6 +243,12 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitExpression_statement([NotNull] ExodiaParser.Expression_statementContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.throw_expression"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitThrow_expression([NotNull] ExodiaParser.Throw_expressionContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.expression"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
