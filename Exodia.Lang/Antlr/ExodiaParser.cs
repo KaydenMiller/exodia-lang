@@ -1741,13 +1741,13 @@ public partial class ExodiaParser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode] public Variable_statementContext variable_statement() {
 			return GetRuleContext<Variable_statementContext>(0);
 		}
-		[System.Diagnostics.DebuggerNonUserCode] public Equality_expressionContext equality_expression() {
-			return GetRuleContext<Equality_expressionContext>(0);
+		[System.Diagnostics.DebuggerNonUserCode] public ExpressionContext[] expression() {
+			return GetRuleContexts<ExpressionContext>();
+		}
+		[System.Diagnostics.DebuggerNonUserCode] public ExpressionContext expression(int i) {
+			return GetRuleContext<ExpressionContext>(i);
 		}
 		[System.Diagnostics.DebuggerNonUserCode] public ITerminalNode SEMI() { return GetToken(ExodiaParser.SEMI, 0); }
-		[System.Diagnostics.DebuggerNonUserCode] public ExpressionContext expression() {
-			return GetRuleContext<ExpressionContext>(0);
-		}
 		[System.Diagnostics.DebuggerNonUserCode] public StatementContext statement() {
 			return GetRuleContext<StatementContext>(0);
 		}
@@ -1788,7 +1788,7 @@ public partial class ExodiaParser : Parser {
 			State = 331;
 			variable_statement();
 			State = 332;
-			equality_expression(0);
+			expression();
 			State = 333;
 			Match(SEMI);
 			State = 334;
@@ -5954,7 +5954,7 @@ public partial class ExodiaParser : Parser {
 		320,5,2,0,0,320,33,1,0,0,0,321,322,5,25,0,0,322,323,3,128,64,0,323,35,
 		1,0,0,0,324,328,3,42,21,0,325,328,3,40,20,0,326,328,3,38,19,0,327,324,
 		1,0,0,0,327,325,1,0,0,0,327,326,1,0,0,0,328,37,1,0,0,0,329,330,5,20,0,
-		0,330,331,5,3,0,0,331,332,3,44,22,0,332,333,3,86,43,0,333,334,5,61,0,0,
+		0,330,331,5,3,0,0,331,332,3,44,22,0,332,333,3,68,34,0,333,334,5,61,0,0,
 		334,335,3,68,34,0,335,336,5,4,0,0,336,337,3,2,1,0,337,39,1,0,0,0,338,339,
 		5,19,0,0,339,340,3,2,1,0,340,341,5,18,0,0,341,342,5,3,0,0,342,343,3,68,
 		34,0,343,344,5,4,0,0,344,41,1,0,0,0,345,346,5,18,0,0,346,347,5,3,0,0,347,

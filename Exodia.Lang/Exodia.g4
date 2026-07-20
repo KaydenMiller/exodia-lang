@@ -188,7 +188,7 @@ iteration_statement
     ;
     
 for_statement
-    : FOR '(' variable_statement equality_expression SEMI expression ')' statement
+    : FOR '(' variable_statement expression SEMI expression ')' statement
     ;
     
 do_while_statement

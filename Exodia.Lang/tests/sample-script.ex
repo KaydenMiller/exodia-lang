@@ -82,11 +82,11 @@ namespace StandardLibrary {
     public struct Temperature {
         private fahrenheit: double;
         
-        public constructor FromFahrenheit(f: double) {
+        public ctor FromFahrenheit(f: double) {
             this.fahrenheit = f;
         }
         
-        public constructor FromCelsius(c: double) {
+        public ctor FromCelsius(c: double) {
             this.fahrenheit = c * (9/5) + 32;
         }
         
@@ -115,7 +115,7 @@ namespace MyPersonLib {
         public Birthday: StandardLibrary::Date;
         public FavoriteTemp: StandardLibrary::Temperature;
         
-        public constructor(
+        public ctor(
                 name: StandardLibrary::String,
                 birthday: StandardLibrary::Date,
                 favoriteTemp: double) {
