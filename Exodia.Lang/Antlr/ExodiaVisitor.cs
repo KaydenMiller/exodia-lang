@@ -363,6 +363,12 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitArgument_list([NotNull] ExodiaParser.Argument_listContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.argument"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitArgument([NotNull] ExodiaParser.ArgumentContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.new_expression"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>

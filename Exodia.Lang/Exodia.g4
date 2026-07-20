@@ -243,7 +243,7 @@ function_declaration
     ;
    
 formal_parameter
-    : identifier COLON type ('=' assignment_expression)?
+    : identifier COLON type (SIMPLE_ASSIGNMENT_OPERATOR assignment_expression)?
     ;
 
 formal_parameter_list
@@ -354,8 +354,12 @@ arguments
     ;
 
 argument_list
-    : assignment_expression 
-    | argument_list ',' assignment_expression
+    : argument 
+    | argument_list ',' argument
+    ;
+
+argument
+    : (identifier ':')? assignment_expression
     ;
     
 new_expression
