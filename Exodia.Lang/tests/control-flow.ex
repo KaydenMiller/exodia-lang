@@ -61,13 +61,13 @@ fn forForms(n: int32): int32 {
     return total;
 }
 
-// --- do-while: braced and brace-less body (grammar: `DO statement WHILE ( expr )`) ---
+// --- do-while: requires a trailing `;` (grammar: `DO statement WHILE ( expr ) SEMI`) ---
 fn doWhileForms(n: int32): int32 {
     mut k: int32 = 0;
 
     do {
         k += 1;
-    } while (k < n)
+    } while (k < n);
 
     return k;
 }

@@ -195,7 +195,7 @@ for_statement
     ;
     
 do_while_statement
-    : DO statement WHILE '(' expression ')'
+    : DO statement WHILE '(' expression ')' SEMI
     ;
     
 while_statement
