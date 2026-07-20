@@ -243,7 +243,7 @@ function_declaration
     ;
    
 formal_parameter
-    : identifier COLON type
+    : identifier COLON type ('=' assignment_expression)?
     ;
 
 formal_parameter_list
