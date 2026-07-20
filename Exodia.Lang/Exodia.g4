@@ -26,7 +26,7 @@ SUPER: 'super';
 NEW: 'new' ;
 MATCH: 'match' ;
 WHEN: 'when' ;
-THROW: 'throw' ;
+PANIC: 'panic' ;
 CHAR: '\'' ( ~['\\\r\n] | ESCAPE ) '\'' ;
 fragment ESCAPE: '\\' ['"\\0nrt] ; // \' \" \\ \0 \n \r \t
 
@@ -67,6 +67,8 @@ GE: '>=' ;
 FATARROW: '=>' ;
 PIPE: '|' ;
 DOTDOT: '..' ;
+QUESTION: '?' ;
+DOUBLE_BANG: '!!' ;
 
 COLONCOLON: '::' ;
 
@@ -262,13 +264,13 @@ expression_statement
     : expression SEMI 
     ;
 
-throw_expression
-    : THROW expression
+panic_expression
+    : PANIC expression
     ;
     
 expression
     :  assignment_expression
-    | throw_expression
+    | panic_expression
     ;
     
 assignment_expression
@@ -341,9 +343,17 @@ multiplicative_expression
     ;
     
 unary_expression
-    : primary_expression 
-    | call_expression
+    : postfix_expression 
     | op=ADDITIVE_OPERATOR unary_expression
+    ;
+    
+postfix_expression
+    : (primary_expression | call_expression) postfix_op*
+    ;
+    
+postfix_op
+    : QUESTION          // ?  : propagate Err/None (safe)
+    | DOUBLE_BANG       // !! : force-unwrap or panic
     ;
    
 call_expression

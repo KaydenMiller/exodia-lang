@@ -243,11 +243,11 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitExpression_statement([NotNull] ExodiaParser.Expression_statementContext context);
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="ExodiaParser.throw_expression"/>.
+	/// Visit a parse tree produced by <see cref="ExodiaParser.panic_expression"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
-	Result VisitThrow_expression([NotNull] ExodiaParser.Throw_expressionContext context);
+	Result VisitPanic_expression([NotNull] ExodiaParser.Panic_expressionContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.expression"/>.
 	/// </summary>
@@ -344,6 +344,18 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitUnary_expression([NotNull] ExodiaParser.Unary_expressionContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.postfix_expression"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitPostfix_expression([NotNull] ExodiaParser.Postfix_expressionContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.postfix_op"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitPostfix_op([NotNull] ExodiaParser.Postfix_opContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.call_expression"/>.
 	/// </summary>

@@ -1,19 +1,15 @@
 /**
- * http-endpoint.ex  -- DESIGN EXPLORATION (aspirational; ahead of the grammar).
- *
- * A minimal-API-style HTTP endpoint showing domain-error -> HTTP-response mapping,
- * the thing ErrorOr helps with in C# but that gets awkward in complex pipelines.
+ * http-endpoint.ex  -- a minimal-API-style HTTP endpoint showing domain-error ->
+ * HTTP-response mapping (the thing ErrorOr helps with in C# but that gets awkward
+ * in complex pipelines).
  *
  * Demonstrates:
  *   - Result<T, E> for fallible service calls
  *   - a domain error ENUM matched exhaustively -> each kind maps to an HTTP status
  *   - `?` to keep the happy path flat instead of nested pipelines
- *   - an arm that does PROCESSING (logging) before returning, not just a value
+ *   - a block arm that does PROCESSING (logging) then `return`s from the function
  *   - constructor-injected services (compile-time DI) + handler-param binding
- *   - `match` (destructure a sum type) vs `switch` (dispatch on a plain value)
- *
- * OPEN: the exact switch-vs-match split is still being decided -- this file is the
- * hypothetical for seeing how each reads.
+ *   - `match` for everything (no `switch`) -- it dispatches on plain values too
  */
 
 namespace Users {
@@ -80,19 +76,20 @@ namespace Api {
                 BadInput(message)     => Http::BadRequest(message),
                 Validation(problems)  => Http::UnprocessableEntity(problems),
                 SystemFailure(detail) => {
-                    // an arm can DO work, not just yield a value: the block's
-                    // last expression is the arm's result.
+                    // A block arm can DO work. `return` here returns from ToResponse
+                    // (the match is in return position), so this arm DIVERGES instead
+                    // of yielding -- type `never`, like a `panic` arm.
                     Logging::Error(detail);
-                    Http::Status(500)
+                    return Http::Status(500);
                 },
             },
         };
     }
 
-    // Contrast: `switch` dispatches on a plain VALUE (no destructuring, discrete cases),
-    // where `match` above destructured a sum type and bound its payloads.
-    public fn StatusText(code: int32): String {
-        return switch code {
+    // `match` also does plain-value dispatch (what other languages use `switch`
+    // for): literal patterns + `_`. Expression-bodied, since it just yields.
+    public fn StatusText(code: int32): String =>
+        match code {
             200 => "OK",
             401 => "Unauthorized",
             404 => "Not Found",
@@ -100,7 +97,6 @@ namespace Api {
             500 => "Server Error",
             _   => "Unknown",
         };
-    }
 }
 
 namespace Program {

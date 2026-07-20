@@ -6,14 +6,14 @@
  *   - Option<T>     a value that may be absent
  *   - match         exhaustive handling (the compiler errors if a variant is missed)
  *   - ?             propagate Err/None as an early return
- *   - throw         the rare, UNRECOVERABLE escape hatch (deliberately NOT in signatures)
+ *   - panic         the rare, UNRECOVERABLE escape hatch (deliberately NOT in signatures)
  *
  * Open design choices flagged inline:
  *   (1) match-arm syntax: `Variant(binding) => body,`  -- picked here, Rust-style
  *   (2) variant resolution: bare `Some` vs qualified `Option::Some` -- bare used here
  *
- * NOTE: like sample-script.ex, this is ahead of the current grammar and will not
- * parse yet -- it specifies the target syntax.
+ * NOTE: value-returning functions are expression-bodied (`=> match { ... }`), so
+ * arms yield values with no per-arm `return`; `?` propagates, `panic` diverges.
  */
 
 namespace StandardLibrary {
@@ -58,20 +58,19 @@ namespace StandardLibrary {
 namespace Demo {
 
     // Handling a Result exhaustively. Omit either arm and the compiler rejects it.
-    public fn describe(input: String): String {
+    // Expression-bodied: the match is the return value, arms just yield.
+    public fn describe(input: String): String =>
         match StandardLibrary::parseUint16(input) {
-            Ok(value)  => return value.ToString(),
-            Err(error) => return "parse failed",
-        }
-    }
+            Ok(value)  => value.ToString(),
+            Err(error) => "parse failed",
+        };
 
     // Handling an Option -- same shape, absence is just data you match on.
-    public fn firstColon(input: String): String {
+    public fn firstColon(input: String): String =>
         match StandardLibrary::indexOf(input, ':') {
-            Some(i) => return "found a colon",
-            None    => return "no colon present",
-        }
-    }
+            Some(i) => "found a colon",
+            None    => "no colon present",
+        };
 
     // `?` propagates Err upward, so the function body only continues on Ok.
     public fn parseSum(a: String, b: String): Result<uint16, StandardLibrary::ParseError> {
@@ -80,12 +79,12 @@ namespace Demo {
         return Ok(first + second);
     }
 
-    // Opting OUT of handling: throw is the unchecked, unrecoverable escape hatch.
-    // Reserved for "this should never happen", NOT for normal error flow.
-    public fn mustParse(input: String): uint16 {
+    // Opting OUT of handling: `panic` is the unchecked, unrecoverable escape hatch.
+    // Reserved for "this should never happen", NOT for normal error flow. The `Ok`
+    // arm yields a uint16; the `Err` arm diverges (`panic` has type `never`).
+    public fn mustParse(input: String): uint16 =>
         match StandardLibrary::parseUint16(input) {
-            Ok(value)  => return value,
-            Err(error) => throw "expected a valid uint16",
-        }
-    }
+            Ok(value)  => value,
+            Err(error) => panic new ParseException("expected a valid uint16"),
+        };
 }

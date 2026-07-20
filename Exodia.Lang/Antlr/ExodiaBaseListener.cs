@@ -457,17 +457,17 @@ public partial class ExodiaBaseListener : IExodiaListener {
 	/// <param name="context">The parse tree.</param>
 	public virtual void ExitExpression_statement([NotNull] ExodiaParser.Expression_statementContext context) { }
 	/// <summary>
-	/// Enter a parse tree produced by <see cref="ExodiaParser.throw_expression"/>.
+	/// Enter a parse tree produced by <see cref="ExodiaParser.panic_expression"/>.
 	/// <para>The default implementation does nothing.</para>
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
-	public virtual void EnterThrow_expression([NotNull] ExodiaParser.Throw_expressionContext context) { }
+	public virtual void EnterPanic_expression([NotNull] ExodiaParser.Panic_expressionContext context) { }
 	/// <summary>
-	/// Exit a parse tree produced by <see cref="ExodiaParser.throw_expression"/>.
+	/// Exit a parse tree produced by <see cref="ExodiaParser.panic_expression"/>.
 	/// <para>The default implementation does nothing.</para>
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
-	public virtual void ExitThrow_expression([NotNull] ExodiaParser.Throw_expressionContext context) { }
+	public virtual void ExitPanic_expression([NotNull] ExodiaParser.Panic_expressionContext context) { }
 	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.expression"/>.
 	/// <para>The default implementation does nothing.</para>
@@ -660,6 +660,30 @@ public partial class ExodiaBaseListener : IExodiaListener {
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	public virtual void ExitUnary_expression([NotNull] ExodiaParser.Unary_expressionContext context) { }
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.postfix_expression"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterPostfix_expression([NotNull] ExodiaParser.Postfix_expressionContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.postfix_expression"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitPostfix_expression([NotNull] ExodiaParser.Postfix_expressionContext context) { }
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.postfix_op"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterPostfix_op([NotNull] ExodiaParser.Postfix_opContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.postfix_op"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitPostfix_op([NotNull] ExodiaParser.Postfix_opContext context) { }
 	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.call_expression"/>.
 	/// <para>The default implementation does nothing.</para>
