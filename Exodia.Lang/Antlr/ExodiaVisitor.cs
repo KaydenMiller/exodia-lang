@@ -448,6 +448,12 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitAtom([NotNull] ExodiaParser.AtomContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.char_literal"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitChar_literal([NotNull] ExodiaParser.Char_literalContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.true_literal"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>

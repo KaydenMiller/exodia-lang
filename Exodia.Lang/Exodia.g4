@@ -26,6 +26,8 @@ SUPER: 'super';
 NEW: 'new' ;
 MATCH: 'match' ;
 WHEN: 'when' ;
+CHAR: '\'' ( ~['\\\r\n] | ESCAPE ) '\'' ;
+fragment ESCAPE: '\\' ['"\\0nrt] ; // \' \" \\ \0 \n \r \t
 
 CONSTRUCTOR: 'ctor';
 
@@ -419,8 +421,13 @@ type_parameters
 literal
     : numeric_literal       #atom
     | string_literal        #atom
+    | char_literal          #atom
     | true_literal          #atom
     | false_literal         #atom
+    ;
+    
+char_literal
+    : CHAR
     ;
     
 true_literal

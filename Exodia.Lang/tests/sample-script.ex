@@ -70,7 +70,7 @@ namespace StandardLibrary {
         private chars: Char[];
         
         public static IndexOf(inputStr: String, charToIndex: Char) : int64 {
-            for (i: int32 = 0; i < chars.Length; i++) {
+            for (mut i: int32 = 0; i < chars.Length; i += 1) {
                 if (chars[i] == charToIndex) {
                     return i;
                 }

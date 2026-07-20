@@ -46,7 +46,7 @@ namespace StandardLibrary {
 
     // Absence: there may be no matching index.
     public fn indexOf(input: String, target: Char): Option<uint16> {
-        for (i: uint16 = 0; i < input.Length; i++) {
+        for (mut i: uint16 = 0; i < input.Length; i += 1) {
             if (input[i] == target) {
                 return Some(i);
             }
