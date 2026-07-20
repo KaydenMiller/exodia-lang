@@ -16,6 +16,7 @@ ELSE: 'else' ;
 WHILE: 'while' ;
 DO: 'do' ;
 FOR: 'for' ;
+GIVE: 'give' ;
 STRUCT: 'struct' ;
 CLASS: 'class' ;
 ENUM: 'enum' ;
@@ -107,6 +108,7 @@ statement
     | block_statement
     | function_declaration
     | return_statement
+    | give_statement
     | variable_statement
     | if_statement
     | iteration_statement
@@ -233,6 +235,10 @@ empty_statement
 
 return_statement
     : RETURN expression? SEMI 
+    ;
+    
+give_statement
+    : GIVE expression SEMI
     ;
     
 block_statement

@@ -76,11 +76,11 @@ namespace Api {
                 BadInput(message)     => Http::BadRequest(message),
                 Validation(problems)  => Http::UnprocessableEntity(problems),
                 SystemFailure(detail) => {
-                    // A block arm can DO work. `return` here returns from ToResponse
-                    // (the match is in return position), so this arm DIVERGES instead
-                    // of yielding -- type `never`, like a `panic` arm.
+                    // A block arm can DO work, then PRODUCE its value with `give`.
+                    // `give` yields to the match (works in return AND assignment
+                    // position) -- distinct from `return`, which would exit ToResponse.
                     Logging::Error(detail);
-                    return Http::Status(500);
+                    give Http::Status(500);
                 },
             },
         };

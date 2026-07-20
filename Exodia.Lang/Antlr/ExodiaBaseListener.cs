@@ -385,6 +385,18 @@ public partial class ExodiaBaseListener : IExodiaListener {
 	/// <param name="context">The parse tree.</param>
 	public virtual void ExitReturn_statement([NotNull] ExodiaParser.Return_statementContext context) { }
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.give_statement"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterGive_statement([NotNull] ExodiaParser.Give_statementContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.give_statement"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitGive_statement([NotNull] ExodiaParser.Give_statementContext context) { }
+	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.block_statement"/>.
 	/// <para>The default implementation does nothing.</para>
 	/// </summary>
