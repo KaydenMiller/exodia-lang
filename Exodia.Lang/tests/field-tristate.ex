@@ -11,8 +11,10 @@
  * `Absent` specially. Only the update-builder below gives `Absent` its "skip"
  * meaning -- and that is just a normal match arm that emits nothing.
  *
- * NOTE: ahead of the current grammar (like sample-script.ex). Struct-literal
- * syntax in `examplePatch` is illustrative and not yet designed.
+ * NOTE: `examplePatch` builds the patch via a named-argument constructor call
+ * whose Field-typed params default to Absent -- so callers name only what they
+ * touch (name/nickname here; age omitted -> Absent). Object-initializer `{ }`
+ * syntax was rejected in favor of named args (DECISIONS §15).
  */
 
 namespace StandardLibrary {
@@ -31,6 +33,17 @@ namespace PersonApi {
         public Name:     StandardLibrary::Field<String>;
         public Nickname: StandardLibrary::Field<String>;
         public Age:      StandardLibrary::Field<uint16>;
+
+        // Every field defaults to Absent, so a caller names only what it touches.
+        public ctor(
+            name:     StandardLibrary::Field<String> = Absent,
+            nickname: StandardLibrary::Field<String> = Absent,
+            age:      StandardLibrary::Field<uint16>  = Absent
+        ) {
+            this.Name     = name;
+            this.Nickname = nickname;
+            this.Age      = age;
+        }
     }
 
     // Turn a patch into SQL SET clauses.
@@ -62,10 +75,10 @@ namespace PersonApi {
     // Constructing a patch: set the name, explicitly clear the nickname,
     // and leave age completely alone. Three different intentions, all expressible.
     public fn examplePatch(): UpdatePersonRequest {
-        return new UpdatePersonRequest {
-            Name:     Value("Kayden"),
-            Nickname: Null,
-            Age:      Absent,
-        };
+        // name -> Value, nickname -> explicit Null, age -> omitted (defaults to Absent).
+        return new UpdatePersonRequest(
+            name:     Value("Kayden"),
+            nickname: Null
+        );
     }
 }
