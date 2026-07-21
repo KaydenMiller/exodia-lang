@@ -15,9 +15,9 @@ try
     Console.WriteLine(tree.ToStringTree(parser));
     
     // LLVM
-    var module = LLVMModuleRef.CreateWithName("");
+    var module = LLVMModuleRef.CreateWithName("exodia");
     var codegen = new CodeGenVisitor(module);
-    var builder = codegen.Builder;
+    Console.WriteLine(codegen.EmitTrivialMain());
 }
 catch (Exception ex)
 {
