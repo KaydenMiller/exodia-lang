@@ -109,6 +109,79 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         return value;
     }
 
+    // a == b , a != b   -> i1
+    public override LLVMValueRef VisitEquality_expression(ExodiaParser.Equality_expressionContext context)
+    {
+        if (context.op is null)
+            return Visit(context.relational_expression());
+
+        var left = Visit(context.left);
+        var right = Visit(context.right);
+        var predicate = context.op.Text switch
+        {
+            "==" => LLVMIntPredicate.LLVMIntEQ,
+            "!=" => LLVMIntPredicate.LLVMIntNE,
+            _ => throw new NotSupportedException($"Equality op '{context.op.Text}'")
+        };
+        return Builder.BuildICmp(predicate, left, right, "cmp");
+    }
+    
+    // a < b , a > b , a <= b , a >= b   -> i1  (signed comparisons)
+    public override LLVMValueRef VisitRelational_expression(ExodiaParser.Relational_expressionContext context)
+    {
+        if (context.op == null)
+            return Visit(context.shift_expression());
+
+        var left = Visit(context.left);
+        var right = Visit(context.right);
+        var pred = context.op.Text switch
+        {
+            "<"  => LLVMIntPredicate.LLVMIntSLT,   // Signed Less Than
+            ">"  => LLVMIntPredicate.LLVMIntSGT,
+            "<=" => LLVMIntPredicate.LLVMIntSLE,
+            ">=" => LLVMIntPredicate.LLVMIntSGE,
+            _ => throw new NotSupportedException($"Relational op '{context.op.Text}'")
+        };
+        return Builder.BuildICmp(pred, left, right, "cmp");
+    }
+
+    public override LLVMValueRef VisitIf_statement(ExodiaParser.If_statementContext context)
+    {
+        var condition = Visit(context.expression()); // an i1 from a comparison
+        var fn = Builder.InsertBlock.Parent;    // the function we're emitting into
+        var hasElse = context.ELSE() is not null;
+
+        var thenBasicBlock = fn.AppendBasicBlock("then");
+        var elseBasicBlock = hasElse ? fn.AppendBasicBlock("else") : default;
+        var mergeBasicBlock = fn.AppendBasicBlock("ifcont");
+        
+        // with no else, the false edge jumps straight to the merge block
+        Builder.BuildCondBr(condition, thenBasicBlock, hasElse ? elseBasicBlock : mergeBasicBlock);
+        
+        // --- then arm ---
+        Builder.PositionAtEnd(thenBasicBlock);
+        Visit(context.statement(0));
+        
+        // Only branch to merge if this arm didn't already terminate. If the then-branch
+        // ended in `return`, the block already has a `ret` -- adding a `br` after it would 
+        // be a SECOND terminator which is invalid IR
+        if (Builder.InsertBlock.Terminator.Handle == IntPtr.Zero)
+            Builder.BuildBr(mergeBasicBlock);
+        
+        // --- else arm ---
+        if (hasElse)
+        {
+            Builder.PositionAtEnd(elseBasicBlock);
+            Visit(context.statement(1));
+            if (Builder.InsertBlock.Terminator.Handle == IntPtr.Zero)
+                Builder.BuildBr(mergeBasicBlock);
+        }
+        
+        // subsequent statements continue in the merge block
+        Builder.PositionAtEnd(mergeBasicBlock);
+        return default;
+    }
+
     // x = <expr> -- mutation of an existing local
     public override LLVMValueRef VisitAssignment_expression(ExodiaParser.Assignment_expressionContext context)
     {
