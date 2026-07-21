@@ -105,8 +105,8 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
     public override LLVMValueRef VisitVariable_declaration(ExodiaParser.Variable_declarationContext context)
     {
         var id = context.identifier().GetText();
-        var type = ExodiaHelpers.MapType(context.type());
-        var value = Visit(context.variable_initializer());
+        var value = Visit(context.variable_initializer()); // must visit first to allow type inference
+        var type = context.type() is { } t ? ExodiaHelpers.MapType(t) : value.TypeOf; // annotation, else infer
         var slot = Builder.BuildAlloca(type, id);
         Builder.BuildStore(value, slot);
         _symbols[id] = (slot, type);

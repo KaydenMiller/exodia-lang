@@ -3,6 +3,6 @@ fn add(x: int32, y: int32): int32 {
 }
 
 fn main(): int32 {
-    mut x: int32 = 1;
+    mut x = 1;
     return add(x, 5);
 }
