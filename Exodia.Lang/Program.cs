@@ -21,7 +21,8 @@ try
     // LLVM
     var module = LLVMModuleRef.CreateWithName("exodia");
     var codegen = new CodeGenVisitor(module);
-    Console.WriteLine(codegen.EmitTrivialMain());
+    codegen.Visit(tree);
+    Console.WriteLine(module.PrintToString());
 }
 catch (Exception ex)
 {
