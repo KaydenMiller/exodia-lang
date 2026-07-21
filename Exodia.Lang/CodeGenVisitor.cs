@@ -182,6 +182,33 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         return default;
     }
 
+    public override LLVMValueRef VisitWhile_statement(ExodiaParser.While_statementContext context)
+    {
+        var fn = Builder.InsertBlock.Parent;
+
+        var condBB = fn.AppendBasicBlock("while.cond");
+        var bodyBB = fn.AppendBasicBlock("while.body");
+        var exitBB = fn.AppendBasicBlock("while.exit");
+        
+        // enter the loop: jump to the condition test
+        Builder.BuildBr(condBB);
+        
+        // --- cond: eval the test every iteration, branch in or out ---
+        Builder.PositionAtEnd(condBB);
+        var condition = Visit(context.expression());
+        Builder.BuildCondBr(condition, bodyBB, exitBB);
+        
+        // --- body: run it, then jump BACK to cond ---
+        Builder.PositionAtEnd(bodyBB);
+        Visit(context.statement());
+        if (Builder.InsertBlock.Terminator.Handle == IntPtr.Zero)
+            Builder.BuildBr(condBB);
+        
+        // --- exit: code after the loop continues here ---
+        Builder.PositionAtEnd(exitBB);
+        return default;
+    }
+
     // x = <expr> -- mutation of an existing local
     public override LLVMValueRef VisitAssignment_expression(ExodiaParser.Assignment_expressionContext context)
     {
