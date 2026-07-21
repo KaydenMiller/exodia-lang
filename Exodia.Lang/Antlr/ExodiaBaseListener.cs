@@ -625,18 +625,6 @@ public partial class ExodiaBaseListener : IExodiaListener {
 	/// <param name="context">The parse tree.</param>
 	public virtual void ExitLeft_hand_side_expression([NotNull] ExodiaParser.Left_hand_side_expressionContext context) { }
 	/// <summary>
-	/// Enter a parse tree produced by <see cref="ExodiaParser.member_expression"/>.
-	/// <para>The default implementation does nothing.</para>
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	public virtual void EnterMember_expression([NotNull] ExodiaParser.Member_expressionContext context) { }
-	/// <summary>
-	/// Exit a parse tree produced by <see cref="ExodiaParser.member_expression"/>.
-	/// <para>The default implementation does nothing.</para>
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	public virtual void ExitMember_expression([NotNull] ExodiaParser.Member_expressionContext context) { }
-	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.this_expression"/>.
 	/// <para>The default implementation does nothing.</para>
 	/// </summary>
@@ -805,18 +793,6 @@ public partial class ExodiaBaseListener : IExodiaListener {
 	/// <param name="context">The parse tree.</param>
 	public virtual void ExitPostfix_op([NotNull] ExodiaParser.Postfix_opContext context) { }
 	/// <summary>
-	/// Enter a parse tree produced by <see cref="ExodiaParser.call_expression"/>.
-	/// <para>The default implementation does nothing.</para>
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	public virtual void EnterCall_expression([NotNull] ExodiaParser.Call_expressionContext context) { }
-	/// <summary>
-	/// Exit a parse tree produced by <see cref="ExodiaParser.call_expression"/>.
-	/// <para>The default implementation does nothing.</para>
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	public virtual void ExitCall_expression([NotNull] ExodiaParser.Call_expressionContext context) { }
-	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.super"/>.
 	/// <para>The default implementation does nothing.</para>
 	/// </summary>
@@ -828,18 +804,6 @@ public partial class ExodiaBaseListener : IExodiaListener {
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	public virtual void ExitSuper([NotNull] ExodiaParser.SuperContext context) { }
-	/// <summary>
-	/// Enter a parse tree produced by <see cref="ExodiaParser.callee"/>.
-	/// <para>The default implementation does nothing.</para>
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	public virtual void EnterCallee([NotNull] ExodiaParser.CalleeContext context) { }
-	/// <summary>
-	/// Exit a parse tree produced by <see cref="ExodiaParser.callee"/>.
-	/// <para>The default implementation does nothing.</para>
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	public virtual void ExitCallee([NotNull] ExodiaParser.CalleeContext context) { }
 	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.arguments"/>.
 	/// <para>The default implementation does nothing.</para>

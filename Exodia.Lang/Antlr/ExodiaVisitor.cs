@@ -327,12 +327,6 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitLeft_hand_side_expression([NotNull] ExodiaParser.Left_hand_side_expressionContext context);
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="ExodiaParser.member_expression"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitMember_expression([NotNull] ExodiaParser.Member_expressionContext context);
-	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.this_expression"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
@@ -417,23 +411,11 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitPostfix_op([NotNull] ExodiaParser.Postfix_opContext context);
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="ExodiaParser.call_expression"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitCall_expression([NotNull] ExodiaParser.Call_expressionContext context);
-	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.super"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitSuper([NotNull] ExodiaParser.SuperContext context);
-	/// <summary>
-	/// Visit a parse tree produced by <see cref="ExodiaParser.callee"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	/// <return>The visitor result.</return>
-	Result VisitCallee([NotNull] ExodiaParser.CalleeContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.arguments"/>.
 	/// </summary>

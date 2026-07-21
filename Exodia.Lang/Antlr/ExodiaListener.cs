@@ -522,16 +522,6 @@ public interface IExodiaListener : IParseTreeListener {
 	/// <param name="context">The parse tree.</param>
 	void ExitLeft_hand_side_expression([NotNull] ExodiaParser.Left_hand_side_expressionContext context);
 	/// <summary>
-	/// Enter a parse tree produced by <see cref="ExodiaParser.member_expression"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	void EnterMember_expression([NotNull] ExodiaParser.Member_expressionContext context);
-	/// <summary>
-	/// Exit a parse tree produced by <see cref="ExodiaParser.member_expression"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	void ExitMember_expression([NotNull] ExodiaParser.Member_expressionContext context);
-	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.this_expression"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
@@ -672,16 +662,6 @@ public interface IExodiaListener : IParseTreeListener {
 	/// <param name="context">The parse tree.</param>
 	void ExitPostfix_op([NotNull] ExodiaParser.Postfix_opContext context);
 	/// <summary>
-	/// Enter a parse tree produced by <see cref="ExodiaParser.call_expression"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	void EnterCall_expression([NotNull] ExodiaParser.Call_expressionContext context);
-	/// <summary>
-	/// Exit a parse tree produced by <see cref="ExodiaParser.call_expression"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	void ExitCall_expression([NotNull] ExodiaParser.Call_expressionContext context);
-	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.super"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
@@ -691,16 +671,6 @@ public interface IExodiaListener : IParseTreeListener {
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	void ExitSuper([NotNull] ExodiaParser.SuperContext context);
-	/// <summary>
-	/// Enter a parse tree produced by <see cref="ExodiaParser.callee"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	void EnterCallee([NotNull] ExodiaParser.CalleeContext context);
-	/// <summary>
-	/// Exit a parse tree produced by <see cref="ExodiaParser.callee"/>.
-	/// </summary>
-	/// <param name="context">The parse tree.</param>
-	void ExitCallee([NotNull] ExodiaParser.CalleeContext context);
 	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.arguments"/>.
 	/// </summary>

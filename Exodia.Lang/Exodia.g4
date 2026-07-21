@@ -332,14 +332,7 @@ assignment_operator
     ;
     
 left_hand_side_expression
-    : member_expression
-    ;
-    
-member_expression
-    : qualified_name
-    | this_expression
-    | member_expression '.' identifier
-    | member_expression '[' expression ']'
+    : postfix_expression
     ;
     
 this_expression
@@ -400,26 +393,19 @@ unary_expression
     ;
     
 postfix_expression
-    : (primary_expression | call_expression) postfix_op*
+    : primary_expression postfix_op*
     ;
     
 postfix_op
-    : QUESTION          // ?  : propagate Err/None (safe)
-    | DOUBLE_BANG       // !! : force-unwrap or panic
-    ;
-   
-call_expression
-    : callee args=arguments                      
-    | super args=arguments                       
-    | call_expression args=arguments             
+    : '.' identifier        // member access
+    | '[' expression ']'    // index
+    | arguments
+    | QUESTION              // ?  : propagate Err/None (safe)
+    | DOUBLE_BANG           // !! : force-unwrap or panic
     ;
     
 super
     : SUPER
-    ;
-    
-callee
-    : lhse=left_hand_side_expression
     ;
     
 arguments
@@ -436,7 +422,7 @@ argument
     ;
     
 new_expression
-    : NEW exp=member_expression args=arguments
+    : NEW qualified_name ('.' identifier)? arguments
     ;
     
 match_expression
@@ -468,7 +454,9 @@ pattern_payload
     
 primary_expression
     : literal
-    | member_expression
+    | qualified_name
+    | this_expression
+    | super
     | parenthesized_expression
     | new_expression
     | match_expression
