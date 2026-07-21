@@ -21,4 +21,7 @@ internal static class ExodiaHelpers
             _ => throw new NotSupportedException($"Type '{name}' not supported in codegen yet")
         };
     }
+
+    public static bool IsFloat(LLVMTypeRef t) =>
+        t.Kind is LLVMTypeKind.LLVMFloatTypeKind or LLVMTypeKind.LLVMDoubleTypeKind;
 }

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using LLVMSharp.Interop;
 
 namespace Exodia.Lang;
@@ -60,8 +61,20 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
     // an integer literal, e.g. 0, 42, 69, 420
     public override LLVMValueRef VisitNumeric_literal(ExodiaParser.Numeric_literalContext context)
     {
-        var value = ulong.Parse(context.GetText());
-        return LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, value);
+        var text = context.GetText().Replace("_", ""); // strip digit separators
+
+        if (context.FLOAT() is not null)
+        {
+            // real literal -> double default. Suffixes f/d/m deferred.
+            if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var d))
+                throw new NotSupportedException($"Float literal suffix not supported yet: '{context.GetText()}'");
+            return LLVMValueRef.CreateConstReal(LLVMTypeRef.Double, d);
+        }
+        
+        // integer literal -> int32 default. Suffixes i8/u32/... deferred.
+        if (!ulong.TryParse(text, out var l))
+            throw new NotSupportedException($"Integer literal suffix not supported yet: '{context.GetText()}'");
+        return LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, l);
     }
 
     public override LLVMValueRef VisitAdditive_expression(ExodiaParser.Additive_expressionContext context)
@@ -71,10 +84,15 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
 
         var left = Visit(context.left);
         var right = Visit(context.right);
+        var isFloat = ExodiaHelpers.IsFloat(left.TypeOf);
         return context.op.Text switch
         {
-            "+" => Builder.BuildAdd(left, right, "add"),
-            "-" => Builder.BuildSub(left, right, "sub"),
+            "+" => isFloat 
+                ? Builder.BuildFAdd(left, right, "fadd") 
+                : Builder.BuildAdd(left, right, "add"),
+            "-" => isFloat
+                ? Builder.BuildFSub(left, right, "fsub")
+                : Builder.BuildSub(left, right, "sub"),
             _ => throw new NotSupportedException($"Additive op '{context.op.Text}'")
         };
     }
@@ -86,10 +104,15 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
 
         var left = Visit(context.left);
         var right = Visit(context.right);
+        var isFloat = ExodiaHelpers.IsFloat(left.TypeOf);
         return context.op.Text switch
         {
-            "*" => Builder.BuildMul(left, right, "mul"),
-            "/" => Builder.BuildSDiv(left, right, "div"),
+            "*" => isFloat 
+                ? Builder.BuildFMul(left, right, "fmul") 
+                : Builder.BuildMul(left, right, "mul"),
+            "/" => isFloat
+                ? Builder.BuildFDiv(left, right, "fdiv") 
+                : Builder.BuildSDiv(left, right, "div"),
             _ => throw new NotSupportedException($"Multiplicative op '{context.op.Text}'")
         };
     }
@@ -120,7 +143,20 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
             return Visit(context.relational_expression());
 
         var left = Visit(context.left);
-        var right = Visit(context.right);
+        var right = Visit(context.right);        
+        var isFloat = ExodiaHelpers.IsFloat(left.TypeOf);
+
+        if (isFloat)
+        {
+            var fpredicate = context.op.Text switch
+            {
+                "==" => LLVMRealPredicate.LLVMRealOEQ,
+                "!=" => LLVMRealPredicate.LLVMRealONE,
+                _ => throw new NotSupportedException($"Equality op '{context.op.Text}'")
+            };
+            return Builder.BuildFCmp(fpredicate, left, right, "fcmp");
+        }
+
         var predicate = context.op.Text switch
         {
             "==" => LLVMIntPredicate.LLVMIntEQ,
@@ -138,6 +174,21 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
 
         var left = Visit(context.left);
         var right = Visit(context.right);
+        var isFloat = ExodiaHelpers.IsFloat(left.TypeOf);
+
+        if (isFloat)
+        {
+            var fpred = context.op.Text switch
+            {
+                "<"  => LLVMRealPredicate.LLVMRealOLT,   // Signed Less Than
+                ">"  => LLVMRealPredicate.LLVMRealOGT,
+                "<=" => LLVMRealPredicate.LLVMRealOLE,
+                ">=" => LLVMRealPredicate.LLVMRealOGE,
+                _ => throw new NotSupportedException($"Relational op '{context.op.Text}'")
+            };
+            return Builder.BuildFCmp(fpred, left, right, "fcmp");
+        }
+        
         var pred = context.op.Text switch
         {
             "<"  => LLVMIntPredicate.LLVMIntSLT,   // Signed Less Than
