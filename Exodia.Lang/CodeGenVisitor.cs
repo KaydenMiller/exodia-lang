@@ -134,6 +134,64 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         return Visit(context.expression());
     }
 
+    public override LLVMValueRef VisitUnary_expression(ExodiaParser.Unary_expressionContext context)
+    {
+        if (context.op is null)
+            return Visit(context.postfix_expression());
+
+        var operand = Visit(context.unary_expression());
+        return context.op.Text switch
+        {
+            "+" => operand,                 // Unary plus: same as no-op
+            "-" => ExodiaHelpers.IsFloat(operand.TypeOf)
+                ? Builder.BuildFNeg(operand, "fneg")
+                : Builder.BuildNeg(operand, "neg"),
+            _ => throw new NotSupportedException($"Unary op '{context.op.Text}'")
+        };
+    }
+
+    public override LLVMValueRef VisitCast_expression(ExodiaParser.Cast_expressionContext context)
+    {
+        var value = Visit(context.unary_expression());
+        foreach (var typeCtx in context.type())
+            value = EmitCast(value, ExodiaHelpers.MapType(typeCtx));
+        return value;
+
+        LLVMValueRef EmitCast(LLVMValueRef value, LLVMTypeRef target)
+        {
+            var source = value.TypeOf;
+            if (source.Handle == target.Handle)
+                return value; // same type = no-op
+
+            var srcFloat = ExodiaHelpers.IsFloat(source);
+            var dstFloat = ExodiaHelpers.IsFloat(target);
+            
+            // int -> int : widen (sext; zext for i1/bool) or narrow (trunc)
+            if (!srcFloat && !dstFloat)
+            {
+                // ZExt -> zero-extend; extends an int with more bits where new bits are 0, preserves as an unsigned number
+                // SExt -> sign-extend; extends an int with more bits but preserves the MSB for signed numbers 
+                if (source.IntWidth == target.IntWidth) return value;
+                if (source.IntWidth < target.IntWidth)
+                    return source.IntWidth == 1
+                        ? Builder.BuildZExt(value, target, "zext")  // bool/i1 => 0/1, not 0/-1
+                        : Builder.BuildSExt(value, target, "sext");
+                return Builder.BuildTrunc(value, target, "trunc");
+            }
+
+            if (!srcFloat && dstFloat) return Builder.BuildSIToFP(value, target, "sitofp"); // int -> float
+            if (srcFloat && !dstFloat) return Builder.BuildFPToSI(value, target, "fptosi"); // float -> int
+            
+            // float -> float : float(32) <-> double(64)
+            var srcBits = source.Kind == LLVMTypeKind.LLVMDoubleTypeKind ? 64 : 32;
+            var dstBits = target.Kind == LLVMTypeKind.LLVMDoubleTypeKind ? 64 : 32;
+            if (srcBits == dstBits) return value;
+            return srcBits < dstBits
+                ? Builder.BuildFPExt(value, target, "fpext")
+                : Builder.BuildFPTrunc(value, target, "fptrunc");
+        }
+    }
+
     public override LLVMValueRef VisitVariable_statement(ExodiaParser.Variable_statementContext context)
         => Visit(context.variable_declaration_list());
 
