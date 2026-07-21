@@ -69,6 +69,7 @@ LE: '<=' ;
 GE: '>=' ;
 
 FATARROW: '=>' ;
+ARROW: '->' ;
 PIPE: '|' ;
 DOTDOT: '..' ;
 QUESTION: '?' ;
@@ -193,7 +194,7 @@ enum_variant_payload
     ;
     
 interface_declaration
-    : INTERFACE identifier interface_extends? '{' interface_member* '}'
+    : accessability_modifier* INTERFACE identifier type_parameters? interface_outputs? interface_extends? where_clause* '{' interface_member* '}'
     ;
 
 interface_extends
@@ -204,12 +205,20 @@ interface_member
     : method_signature 
     ;
     
+interface_outputs
+    : ARROW type_parameter (',' type_parameter)*
+    ;
+    
 method_signature
     : identifier type_parameters? '(' formal_parameter_list? ')' COLON type where_clause* SEMI
     ;
     
 impl_declaration
-    : IMPL type_parameters? type FOR type where_clause* '{' method_declaration* '}'
+    : IMPL type_parameters? type impl_outputs? FOR type where_clause* '{' method_declaration* '}'
+    ;
+    
+impl_outputs
+    : ARROW type (',' type)*
     ;
     
 struct_declaration

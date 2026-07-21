@@ -153,6 +153,12 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitInterface_member([NotNull] ExodiaParser.Interface_memberContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.interface_outputs"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitInterface_outputs([NotNull] ExodiaParser.Interface_outputsContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.method_signature"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
@@ -164,6 +170,12 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitImpl_declaration([NotNull] ExodiaParser.Impl_declarationContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.impl_outputs"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitImpl_outputs([NotNull] ExodiaParser.Impl_outputsContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.struct_declaration"/>.
 	/// </summary>
