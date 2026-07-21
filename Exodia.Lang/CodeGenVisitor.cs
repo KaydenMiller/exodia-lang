@@ -109,6 +109,49 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         return value;
     }
 
+    public override LLVMValueRef VisitPostfix_expression(ExodiaParser.Postfix_expressionContext context)
+    {
+        var ops = context.postfix_op();
+
+        if (ops.Length == 0)
+            return Visit(context.primary_expression());
+
+        if (ops.Length == 1 && ops[0].arguments() is { } argsCtx)
+        {
+            // the callee is resolved by NAME here -- NOT visited as a variable
+            var fnName = context.primary_expression().GetText(); // "add"
+            var callee = Module.GetNamedFunction(fnName);
+            if (callee.Handle == IntPtr.Zero)
+                throw new NotSupportedException($"Unknown function '{fnName}'");
+            
+            // collect args (walk the left-recursive list), eval each
+            var argCtxs = CollectArgs(argsCtx.argument_list());
+            var args = new LLVMValueRef[argCtxs.Count];
+            for (var i = 0; i < argCtxs.Count; i++)
+                args[i] = Visit(argCtxs[i].assignment_expression());
+            
+            // BuildCall2 needs the function TYPE (opaque pointers -> the call site states the signature)
+            var paramTypes = new LLVMTypeRef[args.Length];
+            Array.Fill(paramTypes, LLVMTypeRef.Int32);
+            var fnType = LLVMTypeRef.CreateFunction(LLVMTypeRef.Int32, paramTypes);
+
+            return Builder.BuildCall2(fnType, callee, args, "call");
+        }
+
+        throw new NotSupportedException("Only simple f(args) calls supported so far");
+
+        static List<ExodiaParser.ArgumentContext> CollectArgs(ExodiaParser.Argument_listContext? list)
+        {
+            var result = new List<ExodiaParser.ArgumentContext>();
+            while (list is not null)
+            {
+                result.Insert(0, list.argument());
+                list = list.argument_list();
+            }
+            return result;
+        }
+    }
+
     public override LLVMValueRef VisitQualified_name(ExodiaParser.Qualified_nameContext context)
     {
         var name = context.GetText();
