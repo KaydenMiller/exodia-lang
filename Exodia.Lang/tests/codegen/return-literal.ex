@@ -1,17 +1,8 @@
+fn add(x: int32, y: int32): int32 {
+    return x + y;
+}
+
 fn main(): int32 {
-    mut x = 1;
-    
-    while (x < 10) {
-        x = x + 1;
-    }
-    
-    if (x == 10) {
-        x = x + 5;
-    }
-    
-    if (x > 10) {
-        x = x + 1;
-    }
-    
-    return x;
+    mut x: int32 = 1;
+    return add(x, 5);
 }

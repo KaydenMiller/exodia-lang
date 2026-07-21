@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using LLVMSharp.Interop;
 
 namespace Exodia.Lang;
@@ -6,7 +7,9 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
 {
     public readonly LLVMModuleRef Module;
     public readonly LLVMBuilderRef Builder;
-    private readonly Dictionary<string, LLVMValueRef> _symbols = [];
+    
+    private readonly Dictionary<string, (LLVMValueRef Slot, LLVMTypeRef Type)> _symbols = [];
+    private readonly Dictionary<string, (LLVMValueRef Fn, LLVMTypeRef Signature)> _functions = [];
 
     public CodeGenVisitor(LLVMModuleRef module)
     {
@@ -21,12 +24,13 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         
         // parameters -- all int32 for now
         var formals = context.formal_parameter_list()?.formal_parameter() ?? [];
-        var paramTypes = new LLVMTypeRef[formals.Length];
-        for (var i = 0; i < formals.Length; i++)
-            paramTypes[i] = LLVMTypeRef.Int32;
-        
-        var fnType = LLVMTypeRef.CreateFunction(LLVMTypeRef.Int32, paramTypes);
+        var paramTypes = formals
+            .Select(f => ExodiaHelpers.MapType(f.type()))
+            .ToArray();
+        var returnType = ExodiaHelpers.MapType(context.type());
+        var fnType = LLVMTypeRef.CreateFunction(returnType, paramTypes);
         var fn = Module.AddFunction(name, fnType);
+        _functions[name] = (fn, fnType);
         
         var entry = fn.AppendBasicBlock("entry");
         Builder.PositionAtEnd(entry);
@@ -37,9 +41,9 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         {
             var pName = formals[i].identifier().GetText();
             var pValue = fn.GetParam((uint)i);
-            var slot = Builder.BuildAlloca(LLVMTypeRef.Int32, pName);
-            Builder.BuildStore(pValue, slot);
-            _symbols[pName] = slot;
+            var pSlot = Builder.BuildAlloca(paramTypes[i], pName);
+            Builder.BuildStore(pValue, pSlot);
+            _symbols[pName] = (pSlot, paramTypes[i]);
         }
 
         Visit(context.function_body());
@@ -101,11 +105,11 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
     public override LLVMValueRef VisitVariable_declaration(ExodiaParser.Variable_declarationContext context)
     {
         var id = context.identifier().GetText();
-        var type = context.type()?.GetText();
+        var type = ExodiaHelpers.MapType(context.type());
         var value = Visit(context.variable_initializer());
-        var slot = Builder.BuildAlloca(LLVMTypeRef.Int32, id);
+        var slot = Builder.BuildAlloca(type, id);
         Builder.BuildStore(value, slot);
-        _symbols[id] = slot;
+        _symbols[id] = (slot, type);
         return value;
     }
 
@@ -228,10 +232,10 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         // goes through VisitQualified_name -> BuildLoad2, which loads the value. We want the 
         // slot (address) to store INTO, not a load.
         var name = context.left_hand_side_expression().GetText();
-        if (!_symbols.TryGetValue(name, out var slot))
+        if (!_symbols.TryGetValue(name, out var sym))
             throw new NotSupportedException($"Assignment to unknown name '{name}'");
 
-        Builder.BuildStore(value, slot);
+        Builder.BuildStore(value, sym.Slot);
         return value; // assignment yields the assigned value
     }
 
@@ -246,22 +250,17 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         {
             // the callee is resolved by NAME here -- NOT visited as a variable
             var fnName = context.primary_expression().GetText(); // "add"
-            var callee = Module.GetNamedFunction(fnName);
-            if (callee.Handle == IntPtr.Zero)
+            if (!_functions.TryGetValue(fnName, out var target))
                 throw new NotSupportedException($"Unknown function '{fnName}'");
-            
+
             // collect args (walk the left-recursive list), eval each
             var argCtxs = CollectArgs(argsCtx.argument_list());
             var args = new LLVMValueRef[argCtxs.Count];
             for (var i = 0; i < argCtxs.Count; i++)
                 args[i] = Visit(argCtxs[i].assignment_expression());
             
-            // BuildCall2 needs the function TYPE (opaque pointers -> the call site states the signature)
-            var paramTypes = new LLVMTypeRef[args.Length];
-            Array.Fill(paramTypes, LLVMTypeRef.Int32);
-            var fnType = LLVMTypeRef.CreateFunction(LLVMTypeRef.Int32, paramTypes);
-
-            return Builder.BuildCall2(fnType, callee, args, "call");
+            // target.Type is already the full function type from declaration -- use directly
+            return Builder.BuildCall2(target.Signature, target.Fn, args, "call");
         }
 
         throw new NotSupportedException("Only simple f(args) calls supported so far");
@@ -281,8 +280,8 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
     public override LLVMValueRef VisitQualified_name(ExodiaParser.Qualified_nameContext context)
     {
         var name = context.GetText();
-        if (_symbols.TryGetValue(name, out var slot))
-            return Builder.BuildLoad2(LLVMTypeRef.Int32, slot, name);
+        if (_symbols.TryGetValue(name, out var sym))
+            return Builder.BuildLoad2(sym.Type, sym.Slot, name);
 
         throw new NotSupportedException($"Unknown name '{name}'");
     }
