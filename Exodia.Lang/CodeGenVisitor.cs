@@ -41,22 +41,38 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         return LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, value);
     }
 
-
-    public string EmitTrivialMain()
+    public override LLVMValueRef VisitAdditive_expression(ExodiaParser.Additive_expressionContext context)
     {
-        // the function type: i32 ()
-        var fnType = LLVMTypeRef.CreateFunction(LLVMTypeRef.Int32, Array.Empty<LLVMTypeRef>());
-        
-        // the function in the module
-        var main = Module.AddFunction("main", fnType);
-        
-        // entry block, point builder at it
-        var entry = main.AppendBasicBlock("entry");
-        Builder.PositionAtEnd(entry);
-        
-        // return 0;
-        Builder.BuildRet(LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, 0));
+        if (context.op == null)
+            return Visit(context.multiplicative_expression());
 
-        return Module.PrintToString();
+        var left = Visit(context.left);
+        var right = Visit(context.right);
+        return context.op.Text switch
+        {
+            "+" => Builder.BuildAdd(left, right, "add"),
+            "-" => Builder.BuildSub(left, right, "sub"),
+            _ => throw new NotSupportedException($"Additive op '{context.op.Text}'")
+        };
+    }
+
+    public override LLVMValueRef VisitMultiplicative_expression(ExodiaParser.Multiplicative_expressionContext context)
+    {
+        if (context.op == null)
+            return Visit(context.cast_expression());
+
+        var left = Visit(context.left);
+        var right = Visit(context.right);
+        return context.op.Text switch
+        {
+            "*" => Builder.BuildMul(left, right, "mul"),
+            "/" => Builder.BuildSDiv(left, right, "div"),
+            _ => throw new NotSupportedException($"Multiplicative op '{context.op.Text}'")
+        };
+    }
+
+    public override LLVMValueRef VisitParenthesized_expression(ExodiaParser.Parenthesized_expressionContext context)
+    {
+        return Visit(context.expression());
     }
 }

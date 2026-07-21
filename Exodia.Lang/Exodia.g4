@@ -317,7 +317,7 @@ panic_expression
     ;
     
 expression
-    :  assignment_expression
+    : assignment_expression
     | panic_expression
     ;
     
