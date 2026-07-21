@@ -18,7 +18,30 @@ internal static class ExodiaHelpers
             "float"             => LLVMTypeRef.Float,    // 32-bit IEEE
             "double"            => LLVMTypeRef.Double,   // 64-bit IEEE
             "void"              => LLVMTypeRef.Void,
-            _ => throw new NotSupportedException($"Type '{name}' not supported in codegen yet")
+            _ => throw new NotSupportedException($"Type '{name}' not supported in codegen")
+        };
+    }
+
+    public static LLVMTypeRef MapIntSuffixType(string suffix)
+    {
+        return suffix switch
+        {
+            "i8" or "u8" => LLVMTypeRef.Int8,
+            "i16" or "u16" => LLVMTypeRef.Int16,
+            "i32" or "u32" => LLVMTypeRef.Int32,
+            "i64" or "u64" => LLVMTypeRef.Int64,
+            _ => throw new NotSupportedException($"Type suffix '{suffix}' not supported in codegen")
+        };
+    }
+
+    public static LLVMTypeRef MapFloatSuffixType(char suffix)
+    {
+        return suffix switch
+        {
+            'f' => LLVMTypeRef.Float,
+            'd' => LLVMTypeRef.Double,
+            'm' => throw new NotImplementedException($"Decimal literal not supported yet: 'm'"),
+            _ => LLVMTypeRef.Double, // no suffix -> double default
         };
     }
 

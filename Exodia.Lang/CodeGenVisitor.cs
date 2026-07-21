@@ -61,20 +61,32 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
     // an integer literal, e.g. 0, 42, 69, 420
     public override LLVMValueRef VisitNumeric_literal(ExodiaParser.Numeric_literalContext context)
     {
-        var text = context.GetText().Replace("_", ""); // strip digit separators
+        var raw = context.GetText().Replace("_", ""); // strip digit separators
 
         if (context.FLOAT() is not null)
         {
-            // real literal -> double default. Suffixes f/d/m deferred.
-            if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var d))
+            var digits = raw[..^1];
+            var suffix = raw[^1];
+            var type = ExodiaHelpers.MapFloatSuffixType(suffix);
+            // real literal -> double default.
+            if (!double.TryParse(digits, NumberStyles.Float, CultureInfo.InvariantCulture, out var d))
                 throw new NotSupportedException($"Float literal suffix not supported yet: '{context.GetText()}'");
-            return LLVMValueRef.CreateConstReal(LLVMTypeRef.Double, d);
+            return LLVMValueRef.CreateConstReal(type, d);
         }
         
-        // integer literal -> int32 default. Suffixes i8/u32/... deferred.
-        if (!ulong.TryParse(text, out var l))
-            throw new NotSupportedException($"Integer literal suffix not supported yet: '{context.GetText()}'");
-        return LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, l);
+        // integer: digits are [0-9], so the first i/u marks the suffix start.
+        var suffixIdx = raw.IndexOfAny(['i', 'u']);
+        var intType = LLVMTypeRef.Int32; // Default
+        var intDigits = raw;
+
+        if (suffixIdx >= 0)
+        {
+            var intSuffix = raw[suffixIdx..];
+            intType = ExodiaHelpers.MapIntSuffixType(intSuffix);
+            intDigits = raw[..suffixIdx];
+        }
+        
+        return LLVMValueRef.CreateConstInt(intType, ulong.Parse(intDigits));
     }
 
     public override LLVMValueRef VisitAdditive_expression(ExodiaParser.Additive_expressionContext context)

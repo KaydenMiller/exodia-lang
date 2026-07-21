@@ -1,12 +1,7 @@
 fn main(): int32 {
-    mut x = 1.5;       // inferred double
-    x = x + 2.0;       // fadd -> 3.5
-    x = x * 2.0;       // fmul -> 7.0
-    if (x > 7.5) {     // fcmp ogt -> false
-        return 1;
-    }
-    if (x == 7.0) {    // fcmp oeq -> true
-        return 42;
+    const big = 5000000000i64;   // > 2^31, only valid as i64
+    if (big > 4000000000i64) {   // i64 comparison
+        return 7;
     }
     return 0;
 }
