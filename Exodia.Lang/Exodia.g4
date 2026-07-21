@@ -132,6 +132,10 @@ mut_flag
     : MUT
     ;
     
+where_clause
+    : WHERE identifier COLON type (',' type)* 
+    ;
+    
 namespace_member
     : struct_declaration
     | class_declaration
@@ -157,7 +161,7 @@ member
     ;
     
 method_declaration
-    : identifier type_parameters? '(' formal_parameter_list? ')' COLON type function_body
+    : identifier type_parameters? '(' formal_parameter_list? ')' COLON type where_clause* function_body
     ;
     
 constructor_declaration
@@ -169,11 +173,11 @@ field_declaration
     ;
     
 class_declaration
-    : accessability_modifier* CLASS identifier type_parameters? class_extends? '{' member* '}'
+    : accessability_modifier* CLASS identifier type_parameters? class_extends? where_clause* '{' member* '}'
     ;
 
 enum_declaration
-    : accessability_modifier* ENUM identifier type_parameters? '{' enum_variant_list? '}'
+    : accessability_modifier* ENUM identifier type_parameters? where_clause* '{' enum_variant_list? '}'
     ;
     
 enum_variant_list
@@ -201,15 +205,15 @@ interface_member
     ;
     
 method_signature
-    : identifier type_parameters? '(' formal_parameter_list? ')' COLON type SEMI
+    : identifier type_parameters? '(' formal_parameter_list? ')' COLON type where_clause* SEMI
     ;
     
 impl_declaration
-    : IMPL type_parameters? type FOR type '{' method_declaration* '}'
+    : IMPL type_parameters? type FOR type where_clause* '{' method_declaration* '}'
     ;
     
 struct_declaration
-    : accessability_modifier* STRUCT identifier type_parameters? '{' member* '}'
+    : accessability_modifier* STRUCT identifier type_parameters? where_clause* '{' member* '}'
     ;
     
 class_extends
@@ -275,7 +279,7 @@ block_statement
 // FUNCTIONS
 
 function_declaration
-    : accessability_modifier* FN identifier type_parameters? '(' formal_parameter_list? ')' COLON type function_body
+    : accessability_modifier* FN identifier type_parameters? '(' formal_parameter_list? ')' COLON type where_clause* function_body
     ;
 
 function_body

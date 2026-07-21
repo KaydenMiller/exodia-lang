@@ -57,6 +57,12 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitMut_flag([NotNull] ExodiaParser.Mut_flagContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.where_clause"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitWhere_clause([NotNull] ExodiaParser.Where_clauseContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.namespace_member"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>

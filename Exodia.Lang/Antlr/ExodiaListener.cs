@@ -72,6 +72,16 @@ public interface IExodiaListener : IParseTreeListener {
 	/// <param name="context">The parse tree.</param>
 	void ExitMut_flag([NotNull] ExodiaParser.Mut_flagContext context);
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.where_clause"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterWhere_clause([NotNull] ExodiaParser.Where_clauseContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.where_clause"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitWhere_clause([NotNull] ExodiaParser.Where_clauseContext context);
+	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.namespace_member"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
