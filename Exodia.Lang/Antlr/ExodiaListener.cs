@@ -632,6 +632,16 @@ public interface IExodiaListener : IParseTreeListener {
 	/// <param name="context">The parse tree.</param>
 	void ExitMultiplicative_expression([NotNull] ExodiaParser.Multiplicative_expressionContext context);
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.cast_expression"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterCast_expression([NotNull] ExodiaParser.Cast_expressionContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.cast_expression"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitCast_expression([NotNull] ExodiaParser.Cast_expressionContext context);
+	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.unary_expression"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>

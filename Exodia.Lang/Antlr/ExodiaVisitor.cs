@@ -393,6 +393,12 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitMultiplicative_expression([NotNull] ExodiaParser.Multiplicative_expressionContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.cast_expression"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitCast_expression([NotNull] ExodiaParser.Cast_expressionContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.unary_expression"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>

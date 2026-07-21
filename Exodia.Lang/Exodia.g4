@@ -12,6 +12,7 @@ CONST: 'const' ;
 RETURN: 'return' ;
 FN: 'fn' ;
 IF: 'if' ;
+AS: 'as' ;
 ELSE: 'else' ;
 WHILE: 'while' ;
 DO: 'do' ;
@@ -385,10 +386,14 @@ additive_expression
     ;
     
 multiplicative_expression
-    : unary_expression 
-    | left=multiplicative_expression op=MULTIPLICATIVE_OPERATOR right=unary_expression 
+    : cast_expression 
+    | left=multiplicative_expression op=MULTIPLICATIVE_OPERATOR right=cast_expression 
     ;
     
+cast_expression
+    : unary_expression (AS type)*
+    ;
+
 unary_expression
     : postfix_expression 
     | op=ADDITIVE_OPERATOR unary_expression

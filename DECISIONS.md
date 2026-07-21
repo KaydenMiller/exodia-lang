@@ -124,9 +124,11 @@ Done: correctness fixes → `qualified_name`/`type` → typed declarations (`con
 
 **Static vs dynamic (settled understanding):** interfaces are used **statically far more than dynamically** — generic bounds (`fn f<T: IFoo>`), operators, iteration, equality/hashing all dispatch statically (monomorphized, zero-cost, type preserved). `dyn` is the **escape hatch** for the minority case: mixed collections (`dyn HasArea[]` holding Circle + Rectangle) and runtime-selected impls (DI). `dyn` is also the *weaker* mode (associated types erased, no `Self`/generic methods). `interface-dispatch.ex` shows both from one interface — the definition + impls are identical, only the *use* differs.
 
-**Parser status:** all 27 files in `tests/` parse (adds `interface-dispatch.ex`: static `<T: HasArea>` generic algorithm + dynamic `dyn HasArea[]` mixed collection, same `HasArea` + impls).
+**Parser status:** all 28 files in `tests/` parse (adds `interface-dispatch.ex`: static + dynamic dispatch from one interface; `as-cast.ex`: `as` cast).
 
-**Interface roadmap (remaining increments):** default method bodies (+ private-helper style) · the `(x as IFoo).m()` / `(Type as IFoo)::m` dispatch forms · (later) `in`/`out` variance annotations.
+**`as` cast — DONE** (`AS: 'as'`; `cast_expression : unary_expression (AS type)*` inserted between unary and multiplicative — binds tighter than `*`/`+`, looser than unary `-`; verified `x * x as int64` = `x * (x as int64)`). Operand is any `type`, incl. `x as dyn IFoo` (non-lossy interface upcast). Value-conversion vs interface-upcast is semantic (§4). Chained `x as A as B` parses.
+
+**Interface roadmap (remaining increments):** default method bodies (+ private-helper style) · **postfix-chain unification** (member access / call / `?` / `!!` after ANY primary — parens, call results — which then makes the `(value as IFoo).m()` and `(Type as IFoo)::m` dispatch forms fall out; the UFCS form `IFoo::m(x)` already parses) · (later) `in`/`out` variance annotations.
 
 Other self-contained parser bits (no interface/async dependency): `as` cast rule · unify the postfix chain so member access follows `?`/`!!` (`getUser(id)?.name`) · `\uXXXX` char / string escapes.
 
