@@ -8,8 +8,9 @@
         <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
         <LangVersion>14</LangVersion>
         <RootNamespace>Exodia.Lang</RootNamespace>
+        <NoWarn>$(NoWarn);CS3021</NoWarn>
     </PropertyGroup>
-
+    
     <ItemGroup>
         <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
         <PackageReference Include="libLLVM.runtime.linux-x64" Version="21.1.8" />

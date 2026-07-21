@@ -109,6 +109,32 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         return value;
     }
 
+    // x = <expr> -- mutation of an existing local
+    public override LLVMValueRef VisitAssignment_expression(ExodiaParser.Assignment_expressionContext context)
+    {
+        // passthrough alt: `assignment_expression :  logical_OR_expression`.
+        // EVERY ordinary expression flows through here -- must be preserved.
+        if (context.assignment_expression() is null)
+            return Visit(context.logical_OR_expression());
+
+        var op = context.assignment_operator().GetText();
+        if (op is not "=")
+            throw new NotSupportedException($"Compound assignment '{op}' not supported yet");
+        
+        // RHS first (visit right-recursive, so `a = b = 5` chains for free
+        var value = Visit(context.assignment_expression());
+        
+        // Resolve the LHS to its EXISTING slot. Do NOT Visit() the LHS -- visiting a name
+        // goes through VisitQualified_name -> BuildLoad2, which loads the value. We want the 
+        // slot (address) to store INTO, not a load.
+        var name = context.left_hand_side_expression().GetText();
+        if (!_symbols.TryGetValue(name, out var slot))
+            throw new NotSupportedException($"Assignment to unknown name '{name}'");
+
+        Builder.BuildStore(value, slot);
+        return value; // assignment yields the assigned value
+    }
+
     public override LLVMValueRef VisitPostfix_expression(ExodiaParser.Postfix_expressionContext context)
     {
         var ops = context.postfix_op();

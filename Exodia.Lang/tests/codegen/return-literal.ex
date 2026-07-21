@@ -1,6 +1,8 @@
 fn add(a: int32, b: int32): int32 
 {
-    return a + b;
+    mut c = a + b;
+    c = c + 3;
+    return c;
 }
 
 fn main(): int32 {
