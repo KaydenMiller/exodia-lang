@@ -19,6 +19,8 @@ FOR: 'for' ;
 GIVE: 'give' ;
 STRUCT: 'struct' ;
 CLASS: 'class' ;
+INTERFACE: 'interface' ;
+IMPL: 'impl' ;
 ENUM: 'enum' ;
 NAMESPACE: 'namespace' ;
 EXTENDS: 'extends' ;
@@ -28,6 +30,7 @@ NEW: 'new' ;
 MATCH: 'match' ;
 WHEN: 'when' ;
 PANIC: 'panic' ;
+WHERE: 'where' ;
 CHAR: '\'' ( ~['\\\r\n] | ESCAPE ) '\'' ;
 fragment ESCAPE: '\\' ['"\\0nrt] ; // \' \" \\ \0 \n \r \t
 
@@ -117,6 +120,8 @@ statement
     | struct_declaration
     | enum_declaration
     | namespace_declaration
+    | interface_declaration
+    | impl_declaration
     ;
     
 accessability_modifier
@@ -133,6 +138,8 @@ namespace_member
     | function_declaration
     | enum_declaration
     | namespace_declaration
+    | interface_declaration
+    | impl_declaration
     ;
     
 namespace_declaration
@@ -179,6 +186,26 @@ enum_variant
     
 enum_variant_payload
     : '(' type (',' type)* ')'
+    ;
+    
+interface_declaration
+    : INTERFACE identifier interface_extends? '{' interface_member* '}'
+    ;
+
+interface_extends
+    : EXTENDS qualified_name (',' qualified_name)*
+    ;
+    
+interface_member
+    : method_signature 
+    ;
+    
+method_signature
+    : identifier type_parameters? '(' formal_parameter_list? ')' COLON type SEMI
+    ;
+    
+impl_declaration
+    : IMPL type_parameters? type FOR type '{' method_declaration* '}'
     ;
     
 struct_declaration
@@ -446,7 +473,11 @@ type_arguments
     ;
     
 type_parameters
-    : LT identifier (',' identifier)* GT
+    : LT type_parameter (',' type_parameter)* GT
+    ;
+    
+type_parameter
+    : identifier (COLON type)?
     ;
     
 // LITERALS

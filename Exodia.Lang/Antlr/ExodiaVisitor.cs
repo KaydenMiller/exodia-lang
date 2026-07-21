@@ -129,6 +129,36 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitEnum_variant_payload([NotNull] ExodiaParser.Enum_variant_payloadContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.interface_declaration"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitInterface_declaration([NotNull] ExodiaParser.Interface_declarationContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.interface_extends"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitInterface_extends([NotNull] ExodiaParser.Interface_extendsContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.interface_member"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitInterface_member([NotNull] ExodiaParser.Interface_memberContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.method_signature"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitMethod_signature([NotNull] ExodiaParser.Method_signatureContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.impl_declaration"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitImpl_declaration([NotNull] ExodiaParser.Impl_declarationContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.struct_declaration"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
@@ -476,6 +506,12 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
 	Result VisitType_parameters([NotNull] ExodiaParser.Type_parametersContext context);
+	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.type_parameter"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitType_parameter([NotNull] ExodiaParser.Type_parameterContext context);
 	/// <summary>
 	/// Visit a parse tree produced by the <c>atom</c>
 	/// labeled alternative in <see cref="ExodiaParser.literal"/>.

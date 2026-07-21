@@ -192,6 +192,56 @@ public interface IExodiaListener : IParseTreeListener {
 	/// <param name="context">The parse tree.</param>
 	void ExitEnum_variant_payload([NotNull] ExodiaParser.Enum_variant_payloadContext context);
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.interface_declaration"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterInterface_declaration([NotNull] ExodiaParser.Interface_declarationContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.interface_declaration"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitInterface_declaration([NotNull] ExodiaParser.Interface_declarationContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.interface_extends"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterInterface_extends([NotNull] ExodiaParser.Interface_extendsContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.interface_extends"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitInterface_extends([NotNull] ExodiaParser.Interface_extendsContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.interface_member"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterInterface_member([NotNull] ExodiaParser.Interface_memberContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.interface_member"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitInterface_member([NotNull] ExodiaParser.Interface_memberContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.method_signature"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterMethod_signature([NotNull] ExodiaParser.Method_signatureContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.method_signature"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitMethod_signature([NotNull] ExodiaParser.Method_signatureContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.impl_declaration"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterImpl_declaration([NotNull] ExodiaParser.Impl_declarationContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.impl_declaration"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitImpl_declaration([NotNull] ExodiaParser.Impl_declarationContext context);
+	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.struct_declaration"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
@@ -771,6 +821,16 @@ public interface IExodiaListener : IParseTreeListener {
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	void ExitType_parameters([NotNull] ExodiaParser.Type_parametersContext context);
+	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.type_parameter"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterType_parameter([NotNull] ExodiaParser.Type_parameterContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.type_parameter"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitType_parameter([NotNull] ExodiaParser.Type_parameterContext context);
 	/// <summary>
 	/// Enter a parse tree produced by the <c>atom</c>
 	/// labeled alternative in <see cref="ExodiaParser.literal"/>.
