@@ -18,11 +18,29 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
     public override LLVMValueRef VisitFunction_declaration(ExodiaParser.Function_declarationContext context)
     {
         var name = context.identifier().GetText(); // "main"
-        var fnType = LLVMTypeRef.CreateFunction(LLVMTypeRef.Int32, Array.Empty<LLVMTypeRef>());
+        
+        // parameters -- all int32 for now
+        var formals = context.formal_parameter_list()?.formal_parameter() ?? [];
+        var paramTypes = new LLVMTypeRef[formals.Length];
+        for (var i = 0; i < formals.Length; i++)
+            paramTypes[i] = LLVMTypeRef.Int32;
+        
+        var fnType = LLVMTypeRef.CreateFunction(LLVMTypeRef.Int32, paramTypes);
         var fn = Module.AddFunction(name, fnType);
-
+        
         var entry = fn.AppendBasicBlock("entry");
         Builder.PositionAtEnd(entry);
+        
+        _symbols.Clear(); // fresh scope per function
+
+        for (var i = 0; i < formals.Length; i++)
+        {
+            var pName = formals[i].identifier().GetText();
+            var pValue = fn.GetParam((uint)i);
+            var slot = Builder.BuildAlloca(LLVMTypeRef.Int32, pName);
+            Builder.BuildStore(pValue, slot);
+            _symbols[pName] = slot;
+        }
 
         Visit(context.function_body());
         return fn;

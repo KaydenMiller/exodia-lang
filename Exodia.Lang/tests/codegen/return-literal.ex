@@ -1,5 +1,4 @@
-fn main(): int32 {
-    const a = 5;
-    const b = 3;
-    return 42 + a - (5 * b);
+fn add(a: int32, b: int32): int32 
+{
+    return a + b;
 }
