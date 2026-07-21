@@ -16,7 +16,7 @@ try
     var parser = new ExodiaParser(tokens);
 
     var tree = parser.program();
-    Console.WriteLine(tree.ToStringTree(parser));
+    // Console.WriteLine(tree.ToStringTree(parser));
     
     // LLVM
     var module = LLVMModuleRef.CreateWithName("exodia");
