@@ -5,7 +5,11 @@ using LLVMSharp.Interop;
 try
 {
     // LEXING and PARSING
-    var charStream = CharStreams.fromStream(Console.OpenStandardInput());
+    // Source comes from a file arg (`exodia foo.ex` -- easy to debug in Rider via
+    // Program arguments), falling back to stdin (`echo '…' | dotnet run`).
+    var charStream = args.Length > 0
+        ? CharStreams.fromString(File.ReadAllText(args[0]))
+        : CharStreams.fromStream(Console.OpenStandardInput());
 
     var lexer = new ExodiaLexer(charStream);
     var tokens = new CommonTokenStream(lexer);
