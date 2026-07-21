@@ -6,6 +6,7 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
 {
     public readonly LLVMModuleRef Module;
     public readonly LLVMBuilderRef Builder;
+    private readonly Dictionary<string, LLVMValueRef> _symbols = [];
 
     public CodeGenVisitor(LLVMModuleRef module)
     {
@@ -74,5 +75,28 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
     public override LLVMValueRef VisitParenthesized_expression(ExodiaParser.Parenthesized_expressionContext context)
     {
         return Visit(context.expression());
+    }
+
+    public override LLVMValueRef VisitVariable_statement(ExodiaParser.Variable_statementContext context)
+        => Visit(context.variable_declaration_list());
+
+    public override LLVMValueRef VisitVariable_declaration(ExodiaParser.Variable_declarationContext context)
+    {
+        var id = context.identifier().GetText();
+        var type = context.type()?.GetText();
+        var value = Visit(context.variable_initializer());
+        var slot = Builder.BuildAlloca(LLVMTypeRef.Int32, id);
+        Builder.BuildStore(value, slot);
+        _symbols[id] = slot;
+        return value;
+    }
+
+    public override LLVMValueRef VisitQualified_name(ExodiaParser.Qualified_nameContext context)
+    {
+        var name = context.GetText();
+        if (_symbols.TryGetValue(name, out var slot))
+            return Builder.BuildLoad2(LLVMTypeRef.Int32, slot, name);
+
+        throw new NotSupportedException($"Unknown name '{name}'");
     }
 }
