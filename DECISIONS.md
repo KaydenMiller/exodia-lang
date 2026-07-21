@@ -120,9 +120,13 @@ Done: correctness fixes → `qualified_name`/`type` → typed declarations (`con
 
 **Associated-types design:** outputs are **impl-determined** (vs inputs = caller-chosen), so they get **inference + no param-threading + uniqueness** (`Iterator -> Item`, `for x in it` knows x's type). `->` placed *outside* `<>` so pure-output interfaces need no brackets (`interface Iterator -> Item`) and the single case stays light. Comma-list (no brackets) handles 0/1/many uniformly (`-> Node, Edge`); optionally bounded (`-> Item: IComparable`). Used far beyond operators (iteration, collections, parsers, async, serde-style serializers).
 
-**Parser status:** all 26 files in `tests/` parse (`interface.ex`, `generic-bounds.ex`, `where-clause.ex`, `associated-types.ex`: public/generic interfaces, single/multi/bounded outputs, `impl … -> … for …`, pure-output `Iterator`, everything-at-once).
+ → **`dyn`** (explicit dynamic dispatch, Rust-route chosen over C#-implicit; `DYN: 'dyn'`, added as an optional prefix on `type` → `DYN? qualified_name type_arguments? ('[' ']')*`, so it works everywhere a type appears: params, returns, fields, array elements `dyn HasArea[]`, generic args `List<dyn HasArea>`. `dyn`-only-on-interfaces + trait-object restrictions are semantic).
 
-**Interface roadmap (remaining increments):** default method bodies (+ private-helper style) · `dyn` and the `(x as IFoo)` / `(Type as IFoo)::m` dispatch forms · (later) `in`/`out` variance annotations.
+**Static vs dynamic (settled understanding):** interfaces are used **statically far more than dynamically** — generic bounds (`fn f<T: IFoo>`), operators, iteration, equality/hashing all dispatch statically (monomorphized, zero-cost, type preserved). `dyn` is the **escape hatch** for the minority case: mixed collections (`dyn HasArea[]` holding Circle + Rectangle) and runtime-selected impls (DI). `dyn` is also the *weaker* mode (associated types erased, no `Self`/generic methods). `interface-dispatch.ex` shows both from one interface — the definition + impls are identical, only the *use* differs.
+
+**Parser status:** all 27 files in `tests/` parse (adds `interface-dispatch.ex`: static `<T: HasArea>` generic algorithm + dynamic `dyn HasArea[]` mixed collection, same `HasArea` + impls).
+
+**Interface roadmap (remaining increments):** default method bodies (+ private-helper style) · the `(x as IFoo).m()` / `(Type as IFoo)::m` dispatch forms · (later) `in`/`out` variance annotations.
 
 Other self-contained parser bits (no interface/async dependency): `as` cast rule · unify the postfix chain so member access follows `?`/`!!` (`getUser(id)?.name`) · `\uXXXX` char / string escapes.
 

@@ -16,6 +16,7 @@ ELSE: 'else' ;
 WHILE: 'while' ;
 DO: 'do' ;
 FOR: 'for' ;
+DYN: 'dyn' ;
 GIVE: 'give' ;
 STRUCT: 'struct' ;
 CLASS: 'class' ;
@@ -478,7 +479,7 @@ qualified_name
     ;
     
 type
-    : qualified_name type_arguments? ('[' ']')* 
+    : DYN? qualified_name type_arguments? ('[' ']')* 
     ;
 
 type_arguments
