@@ -134,6 +134,62 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         return Visit(context.expression());
     }
 
+    public override LLVMValueRef VisitLogical_AND_expression(ExodiaParser.Logical_AND_expressionContext context)
+    {
+        if (context.op == null)
+            return Visit(context.equality_expression());        // passthrough
+
+        var left = Visit(context.left);                          // i1
+        var fn = Builder.InsertBlock.Parent;
+        var startBB = Builder.InsertBlock;                       // block holding the condbr
+
+        var rhsBB   = fn.AppendBasicBlock("and.rhs");
+        var mergeBB = fn.AppendBasicBlock("and.end");
+
+        Builder.BuildCondBr(left, rhsBB, mergeBB);               // left false -> straight to merge
+
+        Builder.PositionAtEnd(rhsBB);
+        var right = Visit(context.right);                        // i1
+        var rhsEndBB = Builder.InsertBlock;                      // where we ACTUALLY end (nested && may move it)
+        Builder.BuildBr(mergeBB);
+
+        Builder.PositionAtEnd(mergeBB);
+        var phi = Builder.BuildPhi(LLVMTypeRef.Int1, "and");
+        phi.AddIncoming(
+            [LLVMValueRef.CreateConstInt(LLVMTypeRef.Int1, 0), right],  // false from start, else b
+            [startBB, rhsEndBB],
+            2);
+        return phi;
+    }
+    
+    public override LLVMValueRef VisitLogical_OR_expression(ExodiaParser.Logical_OR_expressionContext context)
+    {
+        if (context.op == null)
+            return Visit(context.logical_AND_expression());     // passthrough
+
+        var left = Visit(context.left);
+        var fn = Builder.InsertBlock.Parent;
+        var startBB = Builder.InsertBlock;
+
+        var rhsBB   = fn.AppendBasicBlock("or.rhs");
+        var mergeBB = fn.AppendBasicBlock("or.end");
+
+        Builder.BuildCondBr(left, mergeBB, rhsBB);               // left TRUE -> skip b, result true
+
+        Builder.PositionAtEnd(rhsBB);
+        var right = Visit(context.right);
+        var rhsEndBB = Builder.InsertBlock;
+        Builder.BuildBr(mergeBB);
+
+        Builder.PositionAtEnd(mergeBB);
+        var phi = Builder.BuildPhi(LLVMTypeRef.Int1, "or");
+        phi.AddIncoming(
+            [LLVMValueRef.CreateConstInt(LLVMTypeRef.Int1, 1), right],  // true from start, else b
+            [startBB, rhsEndBB],
+            2);
+        return phi;
+    }
+
     public override LLVMValueRef VisitUnary_expression(ExodiaParser.Unary_expressionContext context)
     {
         if (context.op is null)
@@ -142,6 +198,7 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         var operand = Visit(context.unary_expression());
         return context.op.Text switch
         {
+            "!" => Builder.BuildNot(operand, "not"),
             "+" => operand,                 // Unary plus: same as no-op
             "-" => ExodiaHelpers.IsFloat(operand.TypeOf)
                 ? Builder.BuildFNeg(operand, "fneg")
@@ -235,6 +292,12 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         };
         return Builder.BuildICmp(predicate, left, right, "cmp");
     }
+
+    public override LLVMValueRef VisitTrue_literal(ExodiaParser.True_literalContext context)
+        => LLVMValueRef.CreateConstInt(LLVMTypeRef.Int1, 1);
+
+    public override LLVMValueRef VisitFalse_literal(ExodiaParser.False_literalContext context)
+        => LLVMValueRef.CreateConstInt(LLVMTypeRef.Int1, 0);
     
     // a < b , a > b , a <= b , a >= b   -> i1  (signed comparisons)
     public override LLVMValueRef VisitRelational_expression(ExodiaParser.Relational_expressionContext context)

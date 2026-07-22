@@ -61,6 +61,8 @@ fragment ADD: '+';
 fragment SUB: '-';
 ADDITIVE_OPERATOR: ADD | SUB ;
 
+LOGICAL_NOT: '!' ;
+
 fragment MUL: '*';
 fragment DIV: '/';
 MULTIPLICATIVE_OPERATOR: MUL | DIV ;
@@ -389,7 +391,7 @@ cast_expression
 
 unary_expression
     : postfix_expression 
-    | op=ADDITIVE_OPERATOR unary_expression
+    | op=(ADDITIVE_OPERATOR | LOGICAL_NOT) unary_expression
     ;
     
 postfix_expression
