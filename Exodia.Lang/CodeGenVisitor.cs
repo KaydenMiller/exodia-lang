@@ -558,6 +558,28 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
             return Builder.BuildCall2(target.Signature, target.Fn, args, "call");
         }
 
+        if (ops.Length == 1 && ops[0].identifier() is { } memberId)
+        {
+            // p.x -- field read on a struct literal. Resolve the base to its SLOT (pointer)
+            // NOT a loaded field, because GEP needs the address to index into
+            var baseName = context.primary_expression().GetText();
+            if (!_symbols.TryGetValue(baseName, out var sym))
+                throw new NotSupportedException($"Unknown name '{baseName}'");
+            if (sym.Type.Kind != LLVMTypeKind.LLVMStructTypeKind)
+                throw new NotSupportedException($"'{baseName}' is not a struct");
+            
+            // find the field's index + type via the struct's name -> StructInfo
+            var structName = sym.Type.StructName;
+            var info = _structs[structName];
+            var fieldName = memberId.GetText();
+            if (!info.Fields.TryGetValue(fieldName, out var field))
+                throw new NotSupportedException($"struct '{structName}' has no field '{fieldName}'");
+            
+            // GEP to the field's address, then load through it
+            var fieldPtr = Builder.BuildStructGEP2(sym.Type, sym.Slot, field.Index, $"{baseName}.{fieldName}.ptr");
+            return Builder.BuildLoad2(field.Type, fieldPtr, $"{baseName}.{fieldName}");
+        }
+
         throw new NotSupportedException("Only simple f(args) calls supported so far");
     }
 
