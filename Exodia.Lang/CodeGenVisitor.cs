@@ -75,40 +75,52 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
             return g;
         }
     }
-    
-    // fn <name>(...): int32 { ... }   -- for now assume i32 return, no params
-    public override LLVMValueRef VisitFunction_declaration(ExodiaParser.Function_declarationContext context)
+
+    private void DeclareFunction(ExodiaParser.Function_declarationContext context)
     {
         var name = context.identifier().GetText(); // "main"
+        if (_functions.ContainsKey(name)) return;
         
         // parameters -- all int32 for now
         var formals = context.formal_parameter_list()?.formal_parameter() ?? [];
         var paramTypes = formals
             .Select(f => ExodiaHelpers.MapType(f.type()))
             .ToArray();
-        var returnType = ExodiaHelpers.MapType(context.type());
-        var fnType = LLVMTypeRef.CreateFunction(returnType, paramTypes);
-        var fn = Module.AddFunction(name, fnType);
-        _functions[name] = (fn, fnType);
+        var fnType = LLVMTypeRef.CreateFunction(ExodiaHelpers.MapType(context.type()), paramTypes);
+        _functions[name] = (Module.AddFunction(name, fnType), fnType);
+    }
+    
+    // fn <name>(...): int32 { ... }   -- for now assume i32 return, no params
+    public override LLVMValueRef VisitFunction_declaration(ExodiaParser.Function_declarationContext context)
+    {
+        DeclareFunction(context);
+        var name = context.identifier().GetText();
+        var fn = _functions[name].Fn;
+        var formals = context.formal_parameter_list()?.formal_parameter() ?? [];
         
-        var entry = fn.AppendBasicBlock("entry");
-        Builder.PositionAtEnd(entry);
-        
+        Builder.PositionAtEnd(fn.AppendBasicBlock("entry"));
         _symbols.Clear(); // fresh scope per function
 
         for (var i = 0; i < formals.Length; i++)
         {
-            var pName = formals[i].identifier().GetText();
-            var pValue = fn.GetParam((uint)i);
-            var pSlot = Builder.BuildAlloca(paramTypes[i], pName);
-            Builder.BuildStore(pValue, pSlot);
-            _symbols[pName] = (pSlot, paramTypes[i]);
+            var t = ExodiaHelpers.MapType(formals[i].type());
+            var slot = Builder.BuildAlloca(t, formals[i].identifier().GetText());
+            Builder.BuildStore(fn.GetParam((uint)i), slot);
+            _symbols[formals[i].identifier().GetText()] = (slot, t);
         }
 
         Visit(context.function_body());
         return fn;
     }
-    
+
+    public override LLVMValueRef VisitProgram(ExodiaParser.ProgramContext context)
+    {
+        foreach (var statement in context.statement())
+            if (statement.function_declaration() is { } fnDeclaration)
+                DeclareFunction(fnDeclaration);
+        return VisitChildren(context);
+    }
+
     // return <expr>;
     public override LLVMValueRef VisitReturn_statement(ExodiaParser.Return_statementContext context)
     {
