@@ -44,6 +44,17 @@ internal static class ExodiaHelpers
             _ => LLVMTypeRef.Double, // no suffix -> double default
         };
     }
+    
+    public static List<ExodiaParser.ArgumentContext> CollectArgs(ExodiaParser.Argument_listContext? list)
+    {
+        var result = new List<ExodiaParser.ArgumentContext>();
+        while (list is not null)
+        {
+            result.Insert(0, list.argument());
+            list = list.argument_list();
+        }
+        return result;
+    }
 
     public static bool IsFloat(LLVMTypeRef t) =>
         t.Kind is LLVMTypeKind.LLVMFloatTypeKind or LLVMTypeKind.LLVMDoubleTypeKind;

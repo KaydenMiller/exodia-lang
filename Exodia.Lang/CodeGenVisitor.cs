@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Net.Mime;
 using LLVMSharp.Interop;
 
 namespace Exodia.Lang;
@@ -11,13 +12,53 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
     
     private readonly Dictionary<string, (LLVMValueRef Slot, LLVMTypeRef Type)> _symbols = [];
     private readonly Dictionary<string, (LLVMValueRef Fn, LLVMTypeRef Signature)> _functions = [];
+    private readonly Dictionary<string, StructInfo> _structs = [];
 
     public CodeGenVisitor(LLVMModuleRef module)
     {
         Module = module;
         Builder = Module.Context.CreateBuilder();
     }
+    
+    public override LLVMValueRef VisitProgram(ExodiaParser.ProgramContext context)
+    {
+        // phase 1: struct types (so signatures/fields can reference them)
+        foreach (var statement in context.statement())
+            if (statement.struct_declaration() is { } sd) 
+                RegisterStruct(sd);
+        
+        // phase 2: function signatures
+        foreach (var statement in context.statement())
+            if (statement.function_declaration() is { } fd)
+                DeclareFunction(fd);
+        
+        // phase 3: bodies
+        return VisitChildren(context);
+    }
 
+    private void RegisterStruct(ExodiaParser.Struct_declarationContext context)
+    {
+        var name = context.identifier().GetText();
+        if (_structs.ContainsKey(name)) return;
+
+        var fields = new Dictionary<string, StructInfoField>();
+        var fieldTypes = new List<LLVMTypeRef>();
+        uint index = 0;
+        foreach (var member in context.member())
+        {
+            if (member.member_kind().field_declaration() is not { } fieldDeclaration) 
+                continue;
+            var memberType = ExodiaHelpers.MapType(fieldDeclaration.type());
+            fields[fieldDeclaration.identifier().GetText()] = new StructInfoField(index, memberType);
+            fieldTypes.Add(memberType);
+            index++;
+        }
+
+        var structType = Module.Context.CreateNamedStruct(name);
+        structType.StructSetBody(fieldTypes.ToArray(), false);
+        _structs[name] = new StructInfo(structType, fields);
+    }
+    
     private readonly Dictionary<string, LLVMValueRef> _formats = new();
     
     private (LLVMValueRef Fn, LLVMTypeRef Type) GetPrintf()
@@ -89,7 +130,10 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         var fnType = LLVMTypeRef.CreateFunction(ExodiaHelpers.MapType(context.type()), paramTypes);
         _functions[name] = (Module.AddFunction(name, fnType), fnType);
     }
-    
+
+    public override LLVMValueRef VisitStruct_declaration(ExodiaParser.Struct_declarationContext context)
+        => default;
+
     // fn <name>(...): int32 { ... }   -- for now assume i32 return, no params
     public override LLVMValueRef VisitFunction_declaration(ExodiaParser.Function_declarationContext context)
     {
@@ -111,14 +155,6 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
 
         Visit(context.function_body());
         return fn;
-    }
-
-    public override LLVMValueRef VisitProgram(ExodiaParser.ProgramContext context)
-    {
-        foreach (var statement in context.statement())
-            if (statement.function_declaration() is { } fnDeclaration)
-                DeclareFunction(fnDeclaration);
-        return VisitChildren(context);
     }
 
     // return <expr>;
@@ -507,7 +543,7 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
             var fnName = context.primary_expression().GetText(); // "add"
 
             // collect args (walk the left-recursive list), eval each
-            var argCtxs = CollectArgs(argsCtx.argument_list());
+            var argCtxs = ExodiaHelpers.CollectArgs(argsCtx.argument_list());
             var args = new LLVMValueRef[argCtxs.Count];
             for (var i = 0; i < argCtxs.Count; i++)
                 args[i] = Visit(argCtxs[i].assignment_expression());
@@ -523,17 +559,30 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         }
 
         throw new NotSupportedException("Only simple f(args) calls supported so far");
+    }
 
-        static List<ExodiaParser.ArgumentContext> CollectArgs(ExodiaParser.Argument_listContext? list)
+    public override LLVMValueRef VisitNew_expression(ExodiaParser.New_expressionContext context)
+    {
+        var name = context.qualified_name().GetText();
+        if (!_structs.TryGetValue(name, out var info))
+            throw new NotSupportedException($"Unknown struct '{name}");
+        
+        // slice 1: positional field init -- arg i initializes field i (declaration order).
+        // (named-ctor form `new T.Ctor(...)` and real ctor bodies come later.)
+        var argCtxs = ExodiaHelpers.CollectArgs(context.arguments().argument_list());
+        if (argCtxs.Count != info.Fields.Count)
+            throw new NotSupportedException(
+                $"struct '{name}' expects {info.Fields.Count} field args, got {argCtxs.Count}");
+        
+        // build the struct value: start from undef, insertvalue each field in order
+        var value = info.Type.Undef;
+        for (var i = 0; i < argCtxs.Count; i++)
         {
-            var result = new List<ExodiaParser.ArgumentContext>();
-            while (list is not null)
-            {
-                result.Insert(0, list.argument());
-                list = list.argument_list();
-            }
-            return result;
+            var fieldValue = Visit(argCtxs[i].assignment_expression());
+            value = Builder.BuildInsertValue(value, fieldValue, (uint)i, $"{name}.f{i}");
         }
+
+        return value;
     }
 
     public override LLVMValueRef VisitQualified_name(ExodiaParser.Qualified_nameContext context)
