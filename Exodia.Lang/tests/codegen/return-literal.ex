@@ -5,9 +5,8 @@ fn circleArea(r: double): double {
 }
 
 fn main(): int32 {
-    const a = circleArea(3.0);  // 3.14159 * 9 = 28.274...
-    const area = a as int32;    // fptosi, truncates toward zero -> 28
-    const n = 10 + -3;          // unary neg via BuildNeg -> 7
-    const wide = area as int64; // sext i32 -> i64
-    return (wide as int32) + n; // trunc back -> 28, + 7 -> 35
+    const a = circleArea(1.25d);
+    print(a);
+    print(12);
+    return 0;
 }

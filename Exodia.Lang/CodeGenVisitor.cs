@@ -17,6 +17,64 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         Module = module;
         Builder = Module.Context.CreateBuilder();
     }
+
+    private readonly Dictionary<string, LLVMValueRef> _formats = new();
+    
+    private (LLVMValueRef Fn, LLVMTypeRef Type) GetPrintf()
+    {
+        var ptrType = LLVMTypeRef.CreatePointer(LLVMTypeRef.Int8, 0);
+        var printfType = LLVMTypeRef.CreateFunction(LLVMTypeRef.Int32, [ptrType], IsVarArg: true);
+
+        var existing = Module.GetNamedFunction("printf");
+        if (existing.Handle != IntPtr.Zero)
+            return (existing, printfType);
+
+        var fn = Module.AddFunction("printf", printfType);
+        return (fn, printfType);
+    }
+
+    private LLVMValueRef EmitPrint(LLVMValueRef[] args)
+    {
+        if (args.Length != 1)
+            throw new NotSupportedException("print expects exactly one argument (for now)");
+
+        var value = args[0];
+        var type = value.TypeOf;
+        string fmt;
+
+        if (ExodiaHelpers.IsFloat(type))
+        {
+            // varargs: a float is promoted to double; %f reads a double.
+            if (type.Kind == LLVMTypeKind.LLVMFloatTypeKind)
+                value = Builder.BuildFPExt(value, LLVMTypeRef.Double, "promote");
+            fmt = "%f\n";
+        }
+        else
+        {
+            // varargs: integers narrower than int are promoted to int.
+            var bits = type.IntWidth;
+            if (bits < 32)
+            {
+                value = bits == 1
+                    ? Builder.BuildZExt(value, LLVMTypeRef.Int32, "promote")   // bool -> 0/1
+                    : Builder.BuildSExt(value, LLVMTypeRef.Int32, "promote");
+                fmt = "%d\n";
+            }
+            else fmt = bits == 32 ? "%d\n" : "%ld\n";   // i64 -> %ld
+        }
+
+        var printf = GetPrintf();
+        var callArgs = new[] { GetFormat(fmt), value };
+        return Builder.BuildCall2(printf.Type, printf.Fn, callArgs, "");
+        
+        LLVMValueRef GetFormat(string fmt)
+        {
+            if (_formats.TryGetValue(fmt, out var g)) return g;
+            g = Builder.BuildGlobalStringPtr(fmt, "fmt");
+            _formats[fmt] = g;
+            return g;
+        }
+    }
     
     // fn <name>(...): int32 { ... }   -- for now assume i32 return, no params
     public override LLVMValueRef VisitFunction_declaration(ExodiaParser.Function_declarationContext context)
@@ -65,9 +123,10 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
 
         if (context.FLOAT() is not null)
         {
-            var digits = raw[..^1];
-            var suffix = raw[^1];
-            var type = ExodiaHelpers.MapFloatSuffixType(suffix);
+            var last = raw[^1];
+            var hasSuffix = last is 'f' or 'd' or 'm';
+            var type = hasSuffix ? ExodiaHelpers.MapFloatSuffixType(last) : LLVMTypeRef.Double;
+            var digits = hasSuffix ? raw[..^1] : raw;
             // real literal -> double default.
             if (!double.TryParse(digits, NumberStyles.Float, CultureInfo.InvariantCulture, out var d))
                 throw new NotSupportedException($"Float literal suffix not supported yet: '{context.GetText()}'");
@@ -434,14 +493,18 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         {
             // the callee is resolved by NAME here -- NOT visited as a variable
             var fnName = context.primary_expression().GetText(); // "add"
-            if (!_functions.TryGetValue(fnName, out var target))
-                throw new NotSupportedException($"Unknown function '{fnName}'");
 
             // collect args (walk the left-recursive list), eval each
             var argCtxs = CollectArgs(argsCtx.argument_list());
             var args = new LLVMValueRef[argCtxs.Count];
             for (var i = 0; i < argCtxs.Count; i++)
                 args[i] = Visit(argCtxs[i].assignment_expression());
+            
+            if (fnName == "print")
+                return EmitPrint(args);
+            
+            if (!_functions.TryGetValue(fnName, out var target))
+                throw new NotSupportedException($"Unknown function '{fnName}'");
             
             // target.Type is already the full function type from declaration -- use directly
             return Builder.BuildCall2(target.Signature, target.Fn, args, "call");
