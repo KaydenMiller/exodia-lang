@@ -13,6 +13,7 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
     private readonly Dictionary<string, (LLVMValueRef Slot, LLVMTypeRef Type)> _symbols = [];
     private readonly Dictionary<string, (LLVMValueRef Fn, LLVMTypeRef Signature)> _functions = [];
     private readonly Dictionary<string, StructInfo> _structs = [];
+    private readonly Dictionary<string, (LLVMValueRef Fn, LLVMTypeRef Signature)> _constructors = [];
 
     public CodeGenVisitor(LLVMModuleRef module)
     {
@@ -34,29 +35,6 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         
         // phase 3: bodies
         return VisitChildren(context);
-    }
-
-    private void RegisterStruct(ExodiaParser.Struct_declarationContext context)
-    {
-        var name = context.identifier().GetText();
-        if (_structs.ContainsKey(name)) return;
-
-        var fields = new Dictionary<string, StructInfoField>();
-        var fieldTypes = new List<LLVMTypeRef>();
-        uint index = 0;
-        foreach (var member in context.member())
-        {
-            if (member.member_kind().field_declaration() is not { } fieldDeclaration) 
-                continue;
-            var memberType = ExodiaHelpers.MapType(fieldDeclaration.type());
-            fields[fieldDeclaration.identifier().GetText()] = new StructInfoField(index, memberType);
-            fieldTypes.Add(memberType);
-            index++;
-        }
-
-        var structType = Module.Context.CreateNamedStruct(name);
-        structType.StructSetBody(fieldTypes.ToArray(), false);
-        _structs[name] = new StructInfo(structType, fields);
     }
     
     private readonly Dictionary<string, LLVMValueRef> _formats = new();
@@ -132,7 +110,75 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
     }
 
     public override LLVMValueRef VisitStruct_declaration(ExodiaParser.Struct_declarationContext context)
-        => default;
+    {
+        var structName = context.identifier().GetText();
+        foreach (var member in context.member())
+            if (member.member_kind().constructor_declaration() is { } ctor && ctor.identifier() is null)
+                EmitConstructor(structName, ctor);
+        return default;
+    }
+    
+    private void DeclareConstructor(string structName, LLVMTypeRef structType,
+        ExodiaParser.Constructor_declarationContext ctor)
+    {
+        var formals = ctor.formal_parameter_list()?.formal_parameter() ?? [];
+        var paramTypes = formals.Select(f => ExodiaHelpers.MapType(f.type())).ToArray();
+        var sig = LLVMTypeRef.CreateFunction(structType, paramTypes);
+        _constructors[structName] = (Module.AddFunction($"{structName}.ctor", sig), sig);
+    }
+
+    private void EmitConstructor(string structName, ExodiaParser.Constructor_declarationContext ctor)
+    {
+        var fn = _constructors[structName].Fn;
+        var structType = _structs[structName].Type;
+        var formals = ctor.formal_parameter_list()?.formal_parameter() ?? [];
+        
+        Builder.PositionAtEnd(fn.AppendBasicBlock("entry"));
+        
+        // `this` is a fresh struct slot the body fills in -- bound as an ordinary symbol,
+        // so `this.x = ...;` flows through ResolveLValue exactly like `p.x = ...;`.
+        var thisSlot = Builder.BuildAlloca(structType, "this");
+        _symbols["this"] = (thisSlot, structType);
+
+        for (var i = 0; i < formals.Length; i++) // bind params as locals
+        {
+            var type = ExodiaHelpers.MapType(formals[i].type());
+            var slot = Builder.BuildAlloca(type, formals[i].identifier().GetText());
+            Builder.BuildStore(fn.GetParam((uint)i), slot);
+            _symbols[formals[i].identifier().GetText()] = (slot, type);
+        }
+
+        Visit(ctor.block_statement()); // this.x = a; this.y = a * 2; ...
+
+        // implicit "return this": load the initialized struct and return it by value
+        Builder.BuildRet(Builder.BuildLoad2(structType, thisSlot, "thisval"));
+    }
+    
+    private void RegisterStruct(ExodiaParser.Struct_declarationContext context)
+    {
+        var name = context.identifier().GetText();
+        if (_structs.ContainsKey(name)) return;
+
+        var fields = new Dictionary<string, StructInfoField>();
+        var fieldTypes = new List<LLVMTypeRef>();
+        uint index = 0;
+        foreach (var member in context.member())
+        {
+            if (member.member_kind().field_declaration() is not { } fieldDeclaration) 
+                continue;
+            var memberType = ExodiaHelpers.MapType(fieldDeclaration.type());
+            fields[fieldDeclaration.identifier().GetText()] = new StructInfoField(index, memberType);
+            fieldTypes.Add(memberType);
+            index++;
+        }
+
+        var structType = Module.Context.CreateNamedStruct(name);
+        structType.StructSetBody(fieldTypes.ToArray(), false);
+        _structs[name] = new StructInfo(structType, fields);
+        foreach (var member in context.member())
+            if (member.member_kind().constructor_declaration() is { } ctor && ctor.identifier() is null)
+                DeclareConstructor(name, structType, ctor);
+    }
 
     // fn <name>(...): int32 { ... }   -- for now assume i32 return, no params
     public override LLVMValueRef VisitFunction_declaration(ExodiaParser.Function_declarationContext context)
@@ -587,21 +633,20 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         if (!_structs.TryGetValue(name, out var info))
             throw new NotSupportedException($"Unknown struct '{name}");
         
-        // slice 1: positional field init -- arg i initializes field i (declaration order).
-        // (named-ctor form `new T.Ctor(...)` and real ctor bodies come later.)
         var argCtxs = ExodiaHelpers.CollectArgs(context.arguments().argument_list());
-        if (argCtxs.Count != info.Fields.Count)
-            throw new NotSupportedException(
-                $"struct '{name}' expects {info.Fields.Count} field args, got {argCtxs.Count}");
+        var args = new LLVMValueRef[argCtxs.Count];
+        for (var i = 0; i < argCtxs.Count; i++)
+            args[i] = Visit(argCtxs[i].assignment_expression());
+
+        if (_constructors.TryGetValue(name, out var ctor)) // has a ctor -> call it
+            return Builder.BuildCall2(ctor.Signature, ctor.Fn, args, $"{name}.new");
         
         // build the struct value: start from undef, insertvalue each field in order
+        if (argCtxs.Count != info.Fields.Count)
+            throw new NotSupportedException($"struct '{name}' expects {info.Fields.Count} field args, got {argCtxs.Count}");
         var value = info.Type.Undef;
         for (var i = 0; i < argCtxs.Count; i++)
-        {
-            var fieldValue = Visit(argCtxs[i].assignment_expression());
-            value = Builder.BuildInsertValue(value, fieldValue, (uint)i, $"{name}.f{i}");
-        }
-
+            value = Builder.BuildInsertValue(value, args[i], (uint)i, $"{name}.f{i}");
         return value;
     }
 
