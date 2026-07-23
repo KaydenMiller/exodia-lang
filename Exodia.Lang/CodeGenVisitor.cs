@@ -12,6 +12,7 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
     private readonly Dictionary<string, Callable> _functions = [];
     private readonly Dictionary<string, StructInfo> _structs = [];
     private readonly Dictionary<string, Callable> _constructors = [];
+    private readonly Dictionary<(string Struct, string Method), Callable> _methods = [];
 
     public CodeGenVisitor(LLVMModuleRef module)
     {
@@ -109,12 +110,56 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         _functions[name] = new Callable(Module.AddFunction(name, fnType), fnType);
     }
 
+    private void DeclareMethod(string structName, LLVMTypeRef structType, ExodiaParser.Method_declarationContext method)
+    {
+        var methodName = method.identifier().GetText();
+        var formals = method.formal_parameter_list()?.formal_parameter() ?? [];
+        var paramTypes = new LLVMTypeRef[formals.Length + 1];
+        paramTypes[0] = LLVMTypeRef.CreatePointer(structType, 0); // `this` by pointer
+        for (var i = 0; i < formals.Length; i++)
+            paramTypes[i + 1] = ExodiaHelpers.MapType(formals[i].type());
+        var sig = LLVMTypeRef.CreateFunction(ExodiaHelpers.MapType(method.type()), paramTypes);
+        _methods[(structName, methodName)] = new Callable(Module.AddFunction($"{structName}.{methodName}", sig), sig);
+    }
+    
+    private void EmitMethod(string structName, ExodiaParser.Method_declarationContext method)
+    {
+        var methodName = method.identifier().GetText();
+        var fn = _methods[(structName, methodName)].Fn;
+        var structType = _structs[structName].Type;
+        var formals = method.formal_parameter_list()?.formal_parameter() ?? [];
+
+        Builder.PositionAtEnd(fn.AppendBasicBlock("entry"));
+        _symbols.Clear();
+        _symbols["this"] = new Symbol(fn.GetParam(0), structType);        // received pointer
+        for (var i = 0; i < formals.Length; i++)
+        {
+            var t = ExodiaHelpers.MapType(formals[i].type());
+            var slot = Builder.BuildAlloca(t, formals[i].identifier().GetText());
+            Builder.BuildStore(fn.GetParam((uint)(i + 1)), slot);
+            _symbols[formals[i].identifier().GetText()] = new Symbol(slot, t);
+        }
+        Visit(method.function_body());
+    }
+
+    public override LLVMValueRef VisitFunction_body(ExodiaParser.Function_bodyContext context)
+    {
+        if (context.expression() is { } expr)
+            return Builder.BuildRet(Visit(expr));   // `=> expr;`
+        return Visit(context.block_statement());    // `{...}`
+    }
+
     public override LLVMValueRef VisitStruct_declaration(ExodiaParser.Struct_declarationContext context)
     {
         var structName = context.identifier().GetText();
         foreach (var member in context.member())
-            if (member.member_kind().constructor_declaration() is { } ctor && ctor.identifier() is null)
+        {
+            var kind = member.member_kind();
+            if (kind.constructor_declaration() is { } ctor && ctor.identifier() is null)
                 EmitConstructor(structName, ctor);
+            else if (kind.method_declaration() is { } method)
+                EmitMethod(structName, method);
+        }
         return default;
     }
     
@@ -178,6 +223,8 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         foreach (var member in context.member())
             if (member.member_kind().constructor_declaration() is { } ctor && ctor.identifier() is null)
                 DeclareConstructor(name, structType, ctor);
+            else if (member.member_kind().method_declaration() is { } method)
+                DeclareMethod(name, structType, method);
     }
 
     // fn <name>(...): int32 { ... }   -- for now assume i32 return, no params
@@ -622,6 +669,25 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
             // GEP to the field's address, then load through it
             var fieldPtr = Builder.BuildStructGEP2(sym.Type, sym.Slot, field.Index, $"{baseName}.{fieldName}.ptr");
             return Builder.BuildLoad2(field.Type, fieldPtr, $"{baseName}.{fieldName}");
+        }
+        
+        if (ops.Length == 2 && ops[0].identifier() is { } methodId && ops[1].arguments() is { } methodArgsCtx)
+        {
+            var baseName = context.primary_expression().GetText();
+            if (!_symbols.TryGetValue(baseName, out var sym))
+                throw new NotSupportedException($"Unknown name '{baseName}'");
+            if (sym.Type.Kind != LLVMTypeKind.LLVMStructTypeKind)
+                throw new NotSupportedException($"'{baseName}' is not a struct");
+            var methodName = methodId.GetText();
+            if (!_methods.TryGetValue((sym.Type.StructName, methodName), out var m))
+                throw new NotSupportedException($"struct '{sym.Type.StructName}' has no method '{methodName}'");
+
+            var argCtxs = ExodiaHelpers.CollectArgs(methodArgsCtx.argument_list());
+            var args = new LLVMValueRef[argCtxs.Count + 1];
+            args[0] = sym.Slot;                                              // pass &receiver as `this`
+            for (var i = 0; i < argCtxs.Count; i++)
+                args[i + 1] = Visit(argCtxs[i].assignment_expression());
+            return Builder.BuildCall2(m.Signature, m.Fn, args, $"{sym.Type.StructName}.{methodName}.call");
         }
 
         throw new NotSupportedException("Only simple f(args) calls supported so far");
