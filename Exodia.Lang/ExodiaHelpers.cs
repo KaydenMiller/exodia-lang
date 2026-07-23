@@ -4,7 +4,7 @@ namespace Exodia.Lang;
 
 internal static class ExodiaHelpers
 {
-    public static LLVMTypeRef MapType(ExodiaParser.TypeContext context)
+    public static LLVMTypeRef MapPrimitiveType(ExodiaParser.TypeContext context)
     {
         var name = context.qualified_name().GetText();
         return name switch
@@ -20,6 +20,15 @@ internal static class ExodiaHelpers
             "void"              => LLVMTypeRef.Void,
             _ => throw new NotSupportedException($"Type '{name}' not supported in codegen")
         };
+    }
+
+    public static LLVMTypeRef MapType(
+        ExodiaParser.TypeContext context,
+        Dictionary<string, StructInfo> structs)
+    {
+        if (structs.TryGetValue(context.qualified_name().GetText(), out var info))
+            return info.Type;
+        return MapPrimitiveType(context);
     }
 
     public static LLVMTypeRef MapIntSuffixType(string suffix)

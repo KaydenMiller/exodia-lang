@@ -104,9 +104,9 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         // parameters -- all int32 for now
         var formals = context.formal_parameter_list()?.formal_parameter() ?? [];
         var paramTypes = formals
-            .Select(f => ExodiaHelpers.MapType(f.type()))
+            .Select(f => ExodiaHelpers.MapType(f.type(), _structs))
             .ToArray();
-        var fnType = LLVMTypeRef.CreateFunction(ExodiaHelpers.MapType(context.type()), paramTypes);
+        var fnType = LLVMTypeRef.CreateFunction(ExodiaHelpers.MapType(context.type(), _structs), paramTypes);
         _functions[name] = new Callable(Module.AddFunction(name, fnType), fnType);
     }
 
@@ -117,8 +117,8 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         var paramTypes = new LLVMTypeRef[formals.Length + 1];
         paramTypes[0] = LLVMTypeRef.CreatePointer(structType, 0); // `this` by pointer
         for (var i = 0; i < formals.Length; i++)
-            paramTypes[i + 1] = ExodiaHelpers.MapType(formals[i].type());
-        var sig = LLVMTypeRef.CreateFunction(ExodiaHelpers.MapType(method.type()), paramTypes);
+            paramTypes[i + 1] = ExodiaHelpers.MapType(formals[i].type(), _structs);
+        var sig = LLVMTypeRef.CreateFunction(ExodiaHelpers.MapType(method.type(), _structs), paramTypes);
         _methods[(structName, methodName)] = new Callable(Module.AddFunction($"{structName}.{methodName}", sig), sig);
     }
     
@@ -134,7 +134,7 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         _symbols["this"] = new Symbol(fn.GetParam(0), structType);        // received pointer
         for (var i = 0; i < formals.Length; i++)
         {
-            var t = ExodiaHelpers.MapType(formals[i].type());
+            var t = ExodiaHelpers.MapType(formals[i].type(), _structs);
             var slot = Builder.BuildAlloca(t, formals[i].identifier().GetText());
             Builder.BuildStore(fn.GetParam((uint)(i + 1)), slot);
             _symbols[formals[i].identifier().GetText()] = new Symbol(slot, t);
@@ -167,7 +167,7 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         ExodiaParser.Constructor_declarationContext ctor)
     {
         var formals = ctor.formal_parameter_list()?.formal_parameter() ?? [];
-        var paramTypes = formals.Select(f => ExodiaHelpers.MapType(f.type())).ToArray();
+        var paramTypes = formals.Select(f => ExodiaHelpers.MapType(f.type(), _structs)).ToArray();
         var sig = LLVMTypeRef.CreateFunction(structType, paramTypes);
         _constructors[structName] = new Callable(Module.AddFunction($"{structName}.ctor", sig), sig);
     }
@@ -187,7 +187,7 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
 
         for (var i = 0; i < formals.Length; i++) // bind params as locals
         {
-            var type = ExodiaHelpers.MapType(formals[i].type());
+            var type = ExodiaHelpers.MapType(formals[i].type(), _structs);
             var slot = Builder.BuildAlloca(type, formals[i].identifier().GetText());
             Builder.BuildStore(fn.GetParam((uint)i), slot);
             _symbols[formals[i].identifier().GetText()] = new Symbol(slot, type);
@@ -211,7 +211,7 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         {
             if (member.member_kind().field_declaration() is not { } fieldDeclaration) 
                 continue;
-            var memberType = ExodiaHelpers.MapType(fieldDeclaration.type());
+            var memberType = ExodiaHelpers.MapType(fieldDeclaration.type(), _structs);
             fields[fieldDeclaration.identifier().GetText()] = new StructInfoField(index, memberType);
             fieldTypes.Add(memberType);
             index++;
@@ -240,7 +240,7 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
 
         for (var i = 0; i < formals.Length; i++)
         {
-            var t = ExodiaHelpers.MapType(formals[i].type());
+            var t = ExodiaHelpers.MapType(formals[i].type(), _structs);
             var slot = Builder.BuildAlloca(t, formals[i].identifier().GetText());
             Builder.BuildStore(fn.GetParam((uint)i), slot);
             _symbols[formals[i].identifier().GetText()] = new Symbol(slot, t);
@@ -411,7 +411,7 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
     {
         var value = Visit(context.unary_expression());
         foreach (var typeCtx in context.type())
-            value = EmitCast(value, ExodiaHelpers.MapType(typeCtx));
+            value = EmitCast(value, ExodiaHelpers.MapType(typeCtx, _structs));
         return value;
 
         LLVMValueRef EmitCast(LLVMValueRef value, LLVMTypeRef target)
@@ -456,7 +456,7 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
     {
         var id = context.identifier().GetText();
         var value = Visit(context.variable_initializer()); // must visit first to allow type inference
-        var type = context.type() is { } t ? ExodiaHelpers.MapType(t) : value.TypeOf; // annotation, else infer
+        var type = context.type() is { } t ? ExodiaHelpers.MapType(t, _structs) : value.TypeOf; // annotation, else infer
         var slot = Builder.BuildAlloca(type, id);
         Builder.BuildStore(value, slot);
         _symbols[id] = new Symbol(slot, type);
