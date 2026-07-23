@@ -1,0 +1,27 @@
+{
+  "name": "exodia-lang",
+  "displayName": "Exodia Language",
+  "description": "Syntax highlighting for the Exodia programming language",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": ["Programming Languages"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "exodia",
+        "aliases": ["Exodia", "exodia"],
+        "extensions": [".ex"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "exodia",
+        "scopeName": "source.exodia",
+        "path": "./syntaxes/exodia.tmLanguage.json"
+      }
+    ]
+  }
+}
