@@ -34,7 +34,8 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         // phase 3: bodies
         return VisitChildren(context);
     }
-    
+
+#region printf
     private readonly Dictionary<string, LLVMValueRef> _formats = new();
     
     private (LLVMValueRef Fn, LLVMTypeRef Type) GetPrintf()
@@ -92,6 +93,7 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
             return g;
         }
     }
+#endregion
 
     private void DeclareFunction(ExodiaParser.Function_declarationContext context)
     {
