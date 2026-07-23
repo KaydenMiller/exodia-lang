@@ -56,6 +56,34 @@ internal static class ExodiaHelpers
         return result;
     }
 
+    public static LLVMValueRef ResolveLValue(
+        ExodiaParser.Postfix_expressionContext lhs,
+        LLVMBuilderRef builder,
+        Dictionary<string, StructInfo> structs,
+        Dictionary<string, (LLVMValueRef Slot, LLVMTypeRef Type)> symbols)
+    {
+        var baseName = lhs.primary_expression().GetText();
+        if (!symbols.TryGetValue(baseName, out var sym))
+            throw new NotSupportedException($"Assignment to unknown name '{baseName}'");
+
+        var ops = lhs.postfix_op();
+        if (ops.Length == 0)
+            return sym.Slot;    // simple local -> its slot
+
+        if (ops.Length == 1 && ops[0].identifier() is { } memberId)
+        {
+            if (sym.Type.Kind != LLVMTypeKind.LLVMStructTypeKind)
+                throw new NotSupportedException($"'{baseName}' is not a struct");
+            var info = structs[sym.Type.StructName];
+            var fieldName = memberId.GetText();
+            if (!info.Fields.TryGetValue(fieldName, out var field))
+                throw new NotSupportedException($"struct '{sym.Type.StructName}' has not field '{fieldName}'");
+            return builder.BuildStructGEP2(sym.Type, sym.Slot, field.Index, $"{baseName}.{fieldName}.ptr");
+        }
+
+        throw new NotSupportedException("Unsupported assignment target.");
+    }
+
     public static bool IsFloat(LLVMTypeRef t) =>
         t.Kind is LLVMTypeKind.LLVMFloatTypeKind or LLVMTypeKind.LLVMDoubleTypeKind;
 }

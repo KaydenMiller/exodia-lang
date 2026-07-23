@@ -518,15 +518,13 @@ public class CodeGenVisitor : ExodiaBaseVisitor<LLVMValueRef>
         
         // RHS first (visit right-recursive, so `a = b = 5` chains for free
         var value = Visit(context.assignment_expression());
-        
-        // Resolve the LHS to its EXISTING slot. Do NOT Visit() the LHS -- visiting a name
-        // goes through VisitQualified_name -> BuildLoad2, which loads the value. We want the 
-        // slot (address) to store INTO, not a load.
-        var name = context.left_hand_side_expression().GetText();
-        if (!_symbols.TryGetValue(name, out var sym))
-            throw new NotSupportedException($"Assignment to unknown name '{name}'");
-
-        Builder.BuildStore(value, sym.Slot);
+        // LHS
+        var ptr = ExodiaHelpers.ResolveLValue(
+            context.left_hand_side_expression().postfix_expression(),
+            Builder,
+            _structs,
+            _symbols);
+        Builder.BuildStore(value, ptr);
         return value; // assignment yields the assigned value
     }
 
