@@ -60,7 +60,7 @@ internal static class ExodiaHelpers
         ExodiaParser.Postfix_expressionContext lhs,
         LLVMBuilderRef builder,
         Dictionary<string, StructInfo> structs,
-        Dictionary<string, (LLVMValueRef Slot, LLVMTypeRef Type)> symbols)
+        Dictionary<string, Symbol> symbols)
     {
         var baseName = lhs.primary_expression().GetText();
         if (!symbols.TryGetValue(baseName, out var sym))
