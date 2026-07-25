@@ -26,6 +26,7 @@ public interface IAstVisitor<T>
     T VisitFieldAccess(FieldAccess node);
     T VisitMethodCall(MethodCall node);
     T VisitThis(ThisExpr node);
+    T VisitMatch(MatchExpr node);
 }
 
 public class AstVisitor : IAstVisitor<LLVMValueRef>
@@ -54,6 +55,8 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     // at park time ({} for a plain struct, {T->i32} for Box$i32) -- composed with the method's own
     // {U->...} at call time. Owner may be a mangled struct name or an impl target type.
     private readonly Dictionary<CallableKey, (MethodDeclaration Method, Dictionary<string, LLVMTypeRef> StructEnv)> _methodTemplates = [];
+    private readonly Dictionary<string, EnumInfo> _enums = [];                        // enum name (or mangled) -> layout + variants
+    private readonly Dictionary<string, EnumDeclaration> _enumTemplates = [];         // generic enums (concrete-only for now)
     
     
     public AstVisitor(LLVMModuleRef module)
@@ -67,6 +70,9 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         foreach (var s in node.Structs)                               // phase 1: struct types + ctor/method decls
             if (s.TypeParams.Count > 0) _structTemplates[s.Name] = s; //   generic -> park (no LLVM layout until T known)
             else RegisterStruct(s);
+        foreach (var e in node.Enums)                                 // phase 1a: enum tagged-union layouts
+            if (e.TypeParams.Count > 0) _enumTemplates[e.Name] = e;   //   generic enums: concrete-only for now
+            else RegisterEnum(e);
         foreach (var i in node.Interfaces) _interfaces[i.Name] = i;   // phase 1b: capture interfaces (dyn/B; no IR)
         foreach (var impl in node.Impls) DeclareImpl(impl);           // phase 1c: impl method signatures
         foreach (var impl in node.Impls) EmitVTable(impl);
@@ -297,6 +303,50 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         foreach (var method in node.Methods) DeclareOrParkMethod(node.Name, structType, method);
     }
 
+    // An enum lowers to { i32 tag, ...payload slots for every variant } (option A: sum-of-payloads).
+    private void RegisterEnum(EnumDeclaration node)
+    {
+        var fieldTypes = new List<LLVMTypeRef> { LLVMTypeRef.Int32 };   // slot 0 = discriminant
+        var variants = new Dictionary<string, EnumVariantInfo>();
+        uint index = 1;
+        var tag = 0;
+        foreach (var v in node.Variants)
+        {
+            var payload = new List<StructInfoField>();
+            foreach (var pType in v.PayloadTypes)
+            {
+                var t = ResolveType(pType);                            // T/E resolve via _activeSubstitutionEnv for generic enums
+                payload.Add(new StructInfoField(index, t));
+                fieldTypes.Add(t);
+                index++;
+            }
+            variants[v.Name] = new EnumVariantInfo(tag, payload);
+            tag++;
+        }
+        var type = _module.Context.CreateNamedStruct(node.Name);
+        type.StructSetBody(fieldTypes.ToArray(), false);
+        _enums[node.Name] = new EnumInfo(type, variants);
+    }
+
+    // Split "Color::Red" -> (enum, variant) if it names a known enum variant; else null.
+    private (EnumInfo Info, EnumVariantInfo Variant)? TryResolveVariant(string qualified)
+    {
+        var parts = qualified.Split("::");
+        if (parts.Length != 2 || !_enums.TryGetValue(parts[0], out var info)) return null;
+        return info.Variants.TryGetValue(parts[1], out var variant) ? (info, variant) : null;
+    }
+
+    // Build an enum value: store the tag into slot 0 and each arg into its payload slot.
+    // Other variants' slots stay undef (never read for this tag).
+    private LLVMValueRef EmitEnumConstruct(EnumInfo info, EnumVariantInfo variant, LLVMValueRef[] args)
+    {
+        var value = info.Type.Undef;
+        value = _builder.BuildInsertValue(value, LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, (ulong)variant.Tag), 0, "tag");
+        for (var i = 0; i < args.Length; i++)
+            value = _builder.BuildInsertValue(value, args[i], variant.Payload[i].Index, "payload");
+        return value;
+    }
+
     // A generic method (`fn echo<U>(...)`) has no LLVM signature until U is known, so park it as a
     // template capturing the owner's current substitution env (the struct's {T->...}); a plain
     // method is declared immediately.
@@ -484,6 +534,92 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         return _builder.BuildLoad2(self.Type, self.Slot, "this");
     }
 
+    // match: load the tag, then an if-else chain -- each arm tests its pattern (tag compare) and,
+    // if it matches, binds any payload and evaluates its body; results merge through a phi.
+    public LLVMValueRef VisitMatch(MatchExpr node)
+    {
+        var scrutinee = node.Scrutinee.Accept(this);
+        if (!_enums.TryGetValue(scrutinee.TypeOf.StructName, out var info))
+            throw new NotSupportedException($"match on non-enum '{scrutinee.TypeOf.StructName}' not supported yet");
+        var tag = _builder.BuildExtractValue(scrutinee, 0, "tag");
+        var fn = _builder.InsertBlock.Parent;
+        var merge = fn.AppendBasicBlock("match.end");
+        var phiVals = new List<LLVMValueRef>();
+        var phiBlocks = new List<LLVMBasicBlockRef>();
+
+        for (var i = 0; i < node.Arms.Count; i++)
+        {
+            var arm = node.Arms[i];
+            if (arm.Guard is not null)
+                throw new NotSupportedException("when-guards not supported yet");
+            var body = fn.AppendBasicBlock($"match.arm{i}");
+            var fail = fn.AppendBasicBlock(i < node.Arms.Count - 1 ? $"match.next{i}" : "match.nomatch");
+            _builder.BuildCondBr(TestPattern(arm.Pattern, tag, info), body, fail);
+
+            _builder.PositionAtEnd(body);
+            BindPattern(arm.Pattern, scrutinee, info);
+            phiVals.Add(arm.BodyExpr!.Accept(this));
+            phiBlocks.Add(_builder.InsertBlock);           // body may have appended blocks
+            _builder.BuildBr(merge);
+
+            _builder.PositionAtEnd(fail);                  // next test, or the nomatch block for the last arm
+        }
+        _builder.BuildUnreachable();                       // exhaustiveness assumed (semantic pass will enforce)
+
+        _builder.PositionAtEnd(merge);
+        var phi = _builder.BuildPhi(phiVals[0].TypeOf, "match.val");
+        phi.AddIncoming(phiVals.ToArray(), phiBlocks.ToArray(), (uint)phiVals.Count);
+        return phi;
+    }
+
+    // Does this pattern match the scrutinee's tag? Variant patterns compare the tag; wildcard and
+    // binding patterns always match.
+    private LLVMValueRef TestPattern(Pattern pattern, LLVMValueRef tag, EnumInfo info) => pattern switch
+    {
+        WildcardPattern                                         => LLVMValueRef.CreateConstInt(LLVMTypeRef.Int1, 1),
+        NamePattern n when info.Variants.TryGetValue(n.Name, out var pv) => TagEquals(tag, pv.Tag),  // payload-less variant (None)
+        NamePattern                                             => LLVMValueRef.CreateConstInt(LLVMTypeRef.Int1, 1),  // a binding
+        VariantPattern v                                        => TagEquals(tag, info.Variants[v.VariantName].Tag),
+        _ => throw new NotSupportedException($"pattern {pattern} not supported")
+    };
+
+    private LLVMValueRef TagEquals(LLVMValueRef tag, int expected) =>
+        _builder.BuildICmp(LLVMIntPredicate.LLVMIntEQ, tag, LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, (ulong)expected), "tag.eq");
+
+    // Bind whatever names the (matched) pattern introduces: a bare binding binds the whole value;
+    // a variant pattern extracts each payload slot into its sub-pattern's name.
+    private void BindPattern(Pattern pattern, LLVMValueRef scrutinee, EnumInfo info)
+    {
+        switch (pattern)
+        {
+            case NamePattern n when !info.Variants.ContainsKey(n.Name):    // binding, not a variant
+                BindLocal(n.Name, scrutinee);
+                break;
+            case VariantPattern v:
+                var variant = info.Variants[v.VariantName];
+                for (var i = 0; i < v.Payload.Count; i++)
+                    switch (v.Payload[i])
+                    {
+                        case NamePattern np:                              // Some(x) -> bind x to payload slot
+                            BindLocal(np.Name, _builder.BuildExtractValue(scrutinee, variant.Payload[i].Index, np.Name));
+                            break;
+                        case WildcardPattern:                             // Some(_) -> ignore
+                            break;
+                        default:
+                            throw new NotSupportedException("nested variant patterns not supported yet");
+                    }
+                break;
+            // WildcardPattern and payload-less variant patterns bind nothing
+        }
+    }
+
+    private void BindLocal(string name, LLVMValueRef value)
+    {
+        var slot = _builder.BuildAlloca(value.TypeOf, name);
+        _builder.BuildStore(value, slot);
+        _symbols[name] = new Symbol(slot, value.TypeOf);
+    }
+
     // Field access needs the base struct's ADDRESS (to GEP), not a loaded value.
     private (LLVMValueRef Ptr, StructInfoField Field) ResolveField(FieldAccess node)
     {
@@ -568,6 +704,8 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     {
         if (_symbols.TryGetValue(node.Name, out var sym))
             return _builder.BuildLoad2(sym.Type, sym.Slot, node.Name);
+        if (node.Name.Contains("::") && TryResolveVariant(node.Name) is { } v)     // payload-less variant: Color::Red
+            return EmitEnumConstruct(v.Info, v.Variant, []);
         throw new NotSupportedException($"Unknown name '{node.Name}'");
     }
 
@@ -666,6 +804,8 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
             .ToArray();
         if (node.Callee == "print")
             return EmitPrint(args);
+        if (node.Callee.Contains("::") && TryResolveVariant(node.Callee) is { } v)   // enum construction: Option::Some(5)
+            return EmitEnumConstruct(v.Info, v.Variant, args);
         var key = new CallableKey("", node.Callee, args.Length);
         if (_functions.TryGetValue(key, out var target))        // already a real fn? then call it
             return _builder.BuildCall2(target.Signature, target.Fn, args, "call");

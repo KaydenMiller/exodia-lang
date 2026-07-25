@@ -29,6 +29,7 @@ public class AstLowering
         var structs = new List<StructDeclaration>();
         var interfaces = new List<InterfaceDeclaration>();
         var impls = new List<ImplDeclaration>();
+        var enums = new List<EnumDeclaration>();
         foreach (var statement in context.statement())
         {
             if (statement.function_declaration() is {} fn)
@@ -39,9 +40,26 @@ public class AstLowering
                 interfaces.Add(LowerInterface(i));
             else if (statement.impl_declaration() is {} impl)
                 impls.Add(LowerImpl(impl));
+            else if (statement.enum_declaration() is {} e)
+                enums.Add(LowerEnum(e));
         }
-        
-        return new ProgramNode(functions, structs, interfaces, impls, Span(context));
+
+        return new ProgramNode(functions, structs, interfaces, impls, enums, Span(context));
+    }
+
+    private EnumDeclaration LowerEnum(ExodiaParser.Enum_declarationContext context)
+    {
+        var variants = (context.enum_variant_list()?.enum_variant() ?? [])
+            .Select(v => new EnumVariant(
+                v.identifier().GetText(),
+                (v.enum_variant_payload()?.type() ?? []).Select(LowerType).ToList(),
+                Span(v)))
+            .ToList();
+        return new EnumDeclaration(
+            context.identifier().GetText(),
+            LowerTypeParams(context.type_parameters(), context.where_clause()),
+            variants,
+            Span(context));
     }
 
     private MethodDeclaration LowerMethodDeclaration(ExodiaParser.Method_declarationContext m)
@@ -366,6 +384,46 @@ public class ExpressionLowering : ExodiaBaseVisitor<Expr>
 
     public override Expr VisitThis_expression(ExodiaParser.This_expressionContext context)
         => new ThisExpr(AstLowering.Span(context));
+
+    public override Expr VisitMatch_expression(ExodiaParser.Match_expressionContext context)
+    {
+        var scrutinee = Visit(context.expression());
+        var arms = context.match_arm().Select(LowerArm).ToList();
+        return new MatchExpr(scrutinee, arms, AstLowering.Span(context));
+    }
+
+    private MatchArm LowerArm(ExodiaParser.Match_armContext arm)
+    {
+        var pattern = LowerPattern(arm.pattern());
+        var guard = arm.WHEN() is not null ? Visit(arm.expression()) : null;
+        var body = arm.arm_body();
+        if (body.block_statement() is not null)
+            throw new NotSupportedException("block-bodied match arms not supported yet");
+        return new MatchArm(pattern, guard, Visit(body.expression()), null, AstLowering.Span(arm));
+    }
+
+    private Pattern LowerPattern(ExodiaParser.PatternContext context)
+    {
+        var prims = context.primary_pattern();
+        if (prims.Length > 1)
+            throw new NotSupportedException("or-patterns (a | b) not supported yet");
+        return LowerPrimaryPattern(prims[0]);
+    }
+
+    private Pattern LowerPrimaryPattern(ExodiaParser.Primary_patternContext context)
+    {
+        var span = AstLowering.Span(context);
+        if (context.GetText() == "_")                             // '_' also lexes as an identifier -- check text first
+            return new WildcardPattern(span);
+        if (context.qualified_name() is { } qn)
+        {
+            var name = qn.identifier().Last().GetText();          // Option::Some -> Some
+            return context.pattern_payload() is { } payload
+                ? new VariantPattern(name, payload.pattern().Select(LowerPattern).ToList(), span)
+                : new NamePattern(name, span);                    // None (variant) or x (binding) -- resolved at match time
+        }
+        throw new NotSupportedException($"literal patterns not supported yet: {context.GetText()}");
+    }
 
     public override Expr VisitPostfix_expression(ExodiaParser.Postfix_expressionContext context)
     {

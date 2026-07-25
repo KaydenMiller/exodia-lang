@@ -31,10 +31,27 @@ public record ProgramNode(
     IReadOnlyList<StructDeclaration> Structs,
     IReadOnlyList<InterfaceDeclaration> Interfaces,
     IReadOnlyList<ImplDeclaration> Impls,
+    IReadOnlyList<EnumDeclaration> Enums,
     TextSpan TextSpan) : AstNode(TextSpan)
 {
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitProgram(this);
 }
+
+public record MatchArm(Pattern Pattern, Expr? Guard, Expr? BodyExpr, Block? BodyBlock, TextSpan TextSpan);
+public record MatchExpr(Expr Scrutinee, IReadOnlyList<MatchArm> Arms, TextSpan TextSpan) : Expr(TextSpan)
+{
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitMatch(this);
+}
+
+// --- enums (data; processed by AstVisitor's RegisterEnum phase, not visited) ---
+public record EnumVariant(string Name, IReadOnlyList<TypeRef> PayloadTypes, TextSpan TextSpan);
+public record EnumDeclaration(string Name, IReadOnlyList<TypeParam> TypeParams, IReadOnlyList<EnumVariant> Variants, TextSpan TextSpan);
+
+// --- patterns (sort of their own; consumed by match codegen, not visited via Accept) ---
+public abstract record Pattern(TextSpan TextSpan);
+public record VariantPattern(string VariantName, IReadOnlyList<Pattern> Payload, TextSpan TextSpan) : Pattern(TextSpan);  // Some(x)
+public record NamePattern(string Name, TextSpan TextSpan) : Pattern(TextSpan);        // bare name: payload-less variant (None) OR a binding -- resolved at match time
+public record WildcardPattern(TextSpan TextSpan) : Pattern(TextSpan);                 // _
 
 // --- interfaces / impls (data; processed by AstVisitor's phases, not visited) ---
 public record MethodSignature(string Name, IReadOnlyList<TypeParam> TypeParams, IReadOnlyList<Param> Params, TypeRef ReturnType, TextSpan TextSpan);
