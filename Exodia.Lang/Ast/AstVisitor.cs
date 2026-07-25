@@ -17,8 +17,11 @@ public interface IAstVisitor<T>
     T VisitCast(CastExpr node);
     T VisitCall(CallExpr node);
     T VisitBinary(BinaryExpr node);
+    T VisitUnary(UnaryExpr node);
+    T VisitWhile(WhileStatement node);
     T VisitIntLiteral(IntLiteral node);
     T VisitFloatLiteral(FloatLiteral node);
+    T VisitBoolLiteral(BoolLiteral node);
 }
 
 public class AstVisitor : IAstVisitor<LLVMValueRef>
@@ -161,6 +164,8 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         var args = node.Args
             .Select(arg => arg.Accept(this))
             .ToArray();
+        if (node.Callee == "print")
+            return EmitPrint(args);
         var key = new CallableKey("", node.Callee, args.Length);
         if (!_functions.TryGetValue(key, out var target))
             throw new NotSupportedException($"no function '{node.Callee}' taking {args.Length} args");
@@ -169,6 +174,12 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
 
     public LLVMValueRef VisitBinary(BinaryExpr node)
     {
+        // && / || short-circuit BEFORE evaluating the right side (unlike arithmetic/comparison,
+        // which need both operands). Same phi machinery as the CST path -- but here it collapses
+        // into one node kind (BinaryExpr) rather than two separate visitors.
+        if (node.Operation is "&&" or "||")
+            return EmitShortCircuit(node);
+
         var left = node.Left.Accept(this);
         var right = node.Right.Accept(this);
         var isFloat = ExodiaHelpers.IsFloat(left.TypeOf);
@@ -188,14 +199,122 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         }; 
     }
 
-    public LLVMValueRef VisitIntLiteral(IntLiteral node)
+    private LLVMValueRef EmitShortCircuit(BinaryExpr node)
     {
-        return LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, node.Value);
+        var isAnd = node.Operation == "&&";
+        var left = node.Left.Accept(this);
+        var fn = _builder.InsertBlock.Parent;
+        var startBB = _builder.InsertBlock;
+        var rhsBB = fn.AppendBasicBlock(isAnd ? "and.rhs" : "or.rhs");
+        var mergeBB = fn.AppendBasicBlock(isAnd ? "and.end" : "or.end");
+
+        // &&: left true -> eval rhs, false -> merge.   ||: left true -> merge, false -> eval rhs.
+        if (isAnd) _builder.BuildCondBr(left, rhsBB, mergeBB);
+        else       _builder.BuildCondBr(left, mergeBB, rhsBB);
+
+        _builder.PositionAtEnd(rhsBB);
+        var right = node.Right.Accept(this);
+        var rhsEndBB = _builder.InsertBlock;            // block we ACTUALLY end in (nested logic may move it)
+        _builder.BuildBr(mergeBB);
+
+        _builder.PositionAtEnd(mergeBB);
+        var phi = _builder.BuildPhi(LLVMTypeRef.Int1, isAnd ? "and" : "or");
+        var shortCircuit = LLVMValueRef.CreateConstInt(LLVMTypeRef.Int1, isAnd ? 0UL : 1UL);
+        phi.AddIncoming([shortCircuit, right], [startBB, rhsEndBB], 2);
+        return phi;
     }
 
-    public LLVMValueRef VisitFloatLiteral(FloatLiteral node)
+    public LLVMValueRef VisitUnary(UnaryExpr node)
     {
-        return LLVMValueRef.CreateConstReal(LLVMTypeRef.Double, node.Value);
+        var operand = node.Operand.Accept(this);
+        return node.Operation switch
+        {
+            "+" => operand,
+            "-" => ExodiaHelpers.IsFloat(operand.TypeOf) ? _builder.BuildFNeg(operand, "fneg") : _builder.BuildNeg(operand, "neg"),
+            "!" => _builder.BuildNot(operand, "not"),
+            _ => throw new NotSupportedException($"unary op '{node.Operation}'")
+        };
+    }
+
+    public LLVMValueRef VisitWhile(WhileStatement node)
+    {
+        var fn = _builder.InsertBlock.Parent;
+        var condBB = fn.AppendBasicBlock("while.cond");
+        var bodyBB = fn.AppendBasicBlock("while.body");
+        var exitBB = fn.AppendBasicBlock("while.exit");
+
+        _builder.BuildBr(condBB);
+        _builder.PositionAtEnd(condBB);
+        _builder.BuildCondBr(node.Condition.Accept(this), bodyBB, exitBB);
+
+        _builder.PositionAtEnd(bodyBB);
+        node.Body.Accept(this);
+        if (_builder.InsertBlock.Terminator.Handle == IntPtr.Zero)
+            _builder.BuildBr(condBB);                   // back-edge
+
+        _builder.PositionAtEnd(exitBB);
+        return default;
+    }
+
+    public LLVMValueRef VisitIntLiteral(IntLiteral node)
+        => LLVMValueRef.CreateConstInt(node.Type is { } t ? ResolveType(t) : LLVMTypeRef.Int32, node.Value);
+
+    public LLVMValueRef VisitFloatLiteral(FloatLiteral node)
+        => LLVMValueRef.CreateConstReal(node.Type is { } t ? ResolveType(t) : LLVMTypeRef.Double, node.Value);
+
+    public LLVMValueRef VisitBoolLiteral(BoolLiteral node)
+        => LLVMValueRef.CreateConstInt(LLVMTypeRef.Int1, node.Value ? 1UL : 0UL);
+
+    // --- print built-in (libc printf bootstrap) ---
+    private readonly Dictionary<string, LLVMValueRef> _formats = [];
+
+    private LLVMValueRef EmitPrint(LLVMValueRef[] args)
+    {
+        if (args.Length != 1)
+            throw new NotSupportedException("print expects exactly one argument (for now)");
+
+        var value = args[0];
+        var type = value.TypeOf;
+        string fmt;
+        if (ExodiaHelpers.IsFloat(type))
+        {
+            if (type.Kind == LLVMTypeKind.LLVMFloatTypeKind)
+                value = _builder.BuildFPExt(value, LLVMTypeRef.Double, "promote");
+            fmt = "%f\n";
+        }
+        else
+        {
+            var bits = type.IntWidth;
+            if (bits < 32)
+            {
+                value = bits == 1
+                    ? _builder.BuildZExt(value, LLVMTypeRef.Int32, "promote")
+                    : _builder.BuildSExt(value, LLVMTypeRef.Int32, "promote");
+                fmt = "%d\n";
+            }
+            else fmt = bits == 32 ? "%d\n" : "%ld\n";
+        }
+
+        var printf = GetPrintf();
+        return _builder.BuildCall2(printf.Type, printf.Fn, new[] { GetFormat(fmt), value }, "");
+    }
+
+    private (LLVMValueRef Fn, LLVMTypeRef Type) GetPrintf()
+    {
+        var printfType = LLVMTypeRef.CreateFunction(
+            LLVMTypeRef.Int32, [LLVMTypeRef.CreatePointer(LLVMTypeRef.Int8, 0)], IsVarArg: true);
+        var existing = _module.GetNamedFunction("printf");
+        return existing.Handle != IntPtr.Zero
+            ? (existing, printfType)
+            : (_module.AddFunction("printf", printfType), printfType);
+    }
+
+    private LLVMValueRef GetFormat(string fmt)
+    {
+        if (_formats.TryGetValue(fmt, out var g)) return g;
+        g = _builder.BuildGlobalStringPtr(fmt, "fmt");
+        _formats[fmt] = g;
+        return g;
     }
 
     private LLVMTypeRef ResolveType(TypeRef type) => type switch

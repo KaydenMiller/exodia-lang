@@ -77,6 +77,8 @@ public class AstLowering
             return LowerBlockStatement(block);
         if (context.variable_statement() is { } var)
             return LowerVariableDeclaration(var);
+        if (context.iteration_statement() is { } iter)
+            return LowerIteration(iter);
         if (context.expression_statement() is { } expr)
             return new ExpressionStatement(_expressions.Visit(expr.expression()), Span(expr));
         throw new NotSupportedException($"statement not lowered yet: {context.GetText()}");
@@ -94,10 +96,21 @@ public class AstLowering
     {
         var cond = _expressions.Visit(context.expression());
         var then = LowerStatement(context.statement(0));
-        var @else = context.ELSE() is not null 
+        var @else = context.ELSE() is not null
             ? LowerStatement(context.statement(1))
             : null;
         return new IfStatement(cond, then, @else, Span(context));
+    }
+
+    private Statement LowerIteration(ExodiaParser.Iteration_statementContext context)
+    {
+        if (context.while_statement() is { } w)
+            return new WhileStatement(
+                _expressions.Visit(w.expression()),
+                LowerStatement(w.statement()),
+                Span(context));
+        // do-while / for come later (both desugar to while)
+        throw new NotSupportedException($"loop not lowered yet: {context.GetText()}");
     }
 }
 
@@ -108,35 +121,45 @@ public class ExpressionLowering : ExodiaBaseVisitor<Expr>
         return new NameRef(context.GetText(), AstLowering.Span(context));
     }
 
+    // `( expr )` -- without this, default VisitChildren returns the throwaway `)` (null).
+    public override Expr VisitParenthesized_expression(ExodiaParser.Parenthesized_expressionContext context)
+        => Visit(context.expression());
+
+    public override Expr VisitTrue_literal(ExodiaParser.True_literalContext context)
+        => new BoolLiteral(true, AstLowering.Span(context));
+
+    public override Expr VisitFalse_literal(ExodiaParser.False_literalContext context)
+        => new BoolLiteral(false, AstLowering.Span(context));
+
     public override Expr VisitNumeric_literal(ExodiaParser.Numeric_literalContext context)
     {
         var raw = context.GetText().Replace("_", ""); // strip digit separators
+        var span = AstLowering.Span(context);
 
         if (context.FLOAT() is not null)
         {
             var last = raw[^1];
             var hasSuffix = last is 'f' or 'd' or 'm';
-            var type = hasSuffix ? ExodiaHelpers.MapFloatSuffixType(last) : LLVMTypeRef.Double;
             var digits = hasSuffix ? raw[..^1] : raw;
-            // real literal -> double default.
-            if (!double.TryParse(digits, NumberStyles.Float, CultureInfo.InvariantCulture, out var d))
-                throw new NotSupportedException($"Float literal suffix not supported yet: '{context.GetText()}'");
-            return new FloatLiteral(d, AstLowering.Span(context));
+            // carry the type as a NamedType (null -> double default); codegen resolves it.
+            TypeRef? type = last switch
+            {
+                'f' => new NamedType("float", span),
+                'd' => new NamedType("double", span),
+                'm' => throw new NotSupportedException($"Decimal literal not supported yet: '{context.GetText()}'"),
+                _   => null
+            };
+            return new FloatLiteral(double.Parse(digits, NumberStyles.Float, CultureInfo.InvariantCulture), type, span);
         }
-        
+
         // integer: digits are [0-9], so the first i/u marks the suffix start.
         var suffixIdx = raw.IndexOfAny(['i', 'u']);
-        var intType = LLVMTypeRef.Int32; // Default
-        var intDigits = raw;
+        if (suffixIdx < 0)
+            return new IntLiteral(ulong.Parse(raw), null, span);   // int32 default
 
-        if (suffixIdx >= 0)
-        {
-            var intSuffix = raw[suffixIdx..];
-            intType = ExodiaHelpers.MapIntSuffixType(intSuffix);
-            intDigits = raw[..suffixIdx];
-        }
-
-        return new IntLiteral(ulong.Parse(intDigits), AstLowering.Span(context));
+        // suffix -> canonical type name: i64 -> int64, u32 -> uint32
+        var typeName = raw[suffixIdx..].Replace("i", "int").Replace("u", "uint");
+        return new IntLiteral(ulong.Parse(raw[..suffixIdx]), new NamedType(typeName, span), span);
     }
 
     public override Expr VisitAssignment_expression(ExodiaParser.Assignment_expressionContext context)
@@ -151,6 +174,27 @@ public class ExpressionLowering : ExodiaBaseVisitor<Expr>
         var target = Visit(context.left_hand_side_expression());
         var value = Visit(context.assignment_expression());
         return new AssignExpr(target, value, AstLowering.Span(context));
+    }
+
+    public override Expr VisitLogical_OR_expression(ExodiaParser.Logical_OR_expressionContext context)
+    {
+        if (context.op is null)
+            return Visit(context.logical_AND_expression());
+        return new BinaryExpr(Visit(context.left), context.op.Text, Visit(context.right), AstLowering.Span(context));
+    }
+
+    public override Expr VisitLogical_AND_expression(ExodiaParser.Logical_AND_expressionContext context)
+    {
+        if (context.op is null)
+            return Visit(context.equality_expression());
+        return new BinaryExpr(Visit(context.left), context.op.Text, Visit(context.right), AstLowering.Span(context));
+    }
+
+    public override Expr VisitUnary_expression(ExodiaParser.Unary_expressionContext context)
+    {
+        if (context.op is null)
+            return Visit(context.postfix_expression());
+        return new UnaryExpr(context.op.Text, Visit(context.unary_expression()), AstLowering.Span(context));
     }
 
     public override Expr VisitAdditive_expression(ExodiaParser.Additive_expressionContext context)

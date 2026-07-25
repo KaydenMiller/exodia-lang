@@ -80,12 +80,27 @@ public record BinaryExpr(Expr Left, string Operation, Expr Right, TextSpan TextS
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitBinary(this);
 }
 
-public record IntLiteral(ulong Value, TextSpan TextSpan) : Expr(TextSpan)
+public record UnaryExpr(string Operation, Expr Operand, TextSpan TextSpan) : Expr(TextSpan)
+{
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitUnary(this);
+}
+
+public record WhileStatement(Expr Condition, Statement Body, TextSpan TextSpan) : Statement(TextSpan)
+{
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitWhile(this);
+}
+
+public record IntLiteral(ulong Value, TypeRef? Type, TextSpan TextSpan) : Expr(TextSpan)
 {
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitIntLiteral(this);
 }
 
-public record FloatLiteral(double Value, TextSpan TextSpan) : Expr(TextSpan)
+public record FloatLiteral(double Value, TypeRef? Type, TextSpan TextSpan) : Expr(TextSpan)
 {
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitFloatLiteral(this);
+}
+
+public record BoolLiteral(bool Value, TextSpan TextSpan) : Expr(TextSpan)
+{
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitBoolLiteral(this);
 }
