@@ -60,6 +60,11 @@ public record ExpressionStatement(Expr Expression, TextSpan TextSpan) : Statemen
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitExpressionStatement(this);
 }
 
+public record CallExpr(string Callee, IReadOnlyList<Expr> Args, TextSpan TextSpan) : Expr(TextSpan)
+{
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitCall(this);
+}
+
 public record AssignExpr(Expr Target, Expr Value, TextSpan TextSpan) : Expr(TextSpan)
 {
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitAssignmentExpr(this);

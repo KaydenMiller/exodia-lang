@@ -188,4 +188,22 @@ public class ExpressionLowering : ExodiaBaseVisitor<Expr>
             value = new CastExpr(value, AstLowering.LowerType(typeCtx), AstLowering.Span(typeCtx));
         return value;
     }
+
+    public override Expr VisitPostfix_expression(ExodiaParser.Postfix_expressionContext context)
+    {
+        var ops = context.postfix_op();
+        if (ops.Length == 0)
+            return Visit(context.primary_expression());
+
+        if (ops.Length == 1 && ops[0].arguments() is { } argsCtx)
+        {
+            var callee = context.primary_expression().GetText();
+            var args = ExodiaHelpers.CollectArgs(argsCtx.argument_list())
+                .Select(arg => Visit(arg.assignment_expression()))
+                .ToList();
+            return new CallExpr(callee, args, AstLowering.Span(context));
+        }
+
+        throw new NotSupportedException($"postfix form not lowered yet: {context.GetText()}");
+    }
 }

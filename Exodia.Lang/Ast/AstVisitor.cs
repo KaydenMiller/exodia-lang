@@ -15,6 +15,7 @@ public interface IAstVisitor<T>
     T VisitAssignmentExpr(AssignExpr node);
     T VisitExpressionStatement(ExpressionStatement node);
     T VisitCast(CastExpr node);
+    T VisitCall(CallExpr node);
     T VisitBinary(BinaryExpr node);
     T VisitIntLiteral(IntLiteral node);
     T VisitFloatLiteral(FloatLiteral node);
@@ -25,6 +26,7 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     public readonly LLVMModuleRef _module;
     public readonly LLVMBuilderRef _builder;
     private readonly Dictionary<string, Symbol> _symbols = [];
+    private readonly Dictionary<CallableKey, Callable> _functions = [];
 
     public AstVisitor(LLVMModuleRef module)
     {
@@ -34,18 +36,29 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     
     public LLVMValueRef VisitProgram(ProgramNode node)
     {
-        foreach (var fn in node.Functions)
-            fn.Accept(this);
+        foreach (var fn in node.Functions) DeclareFunction(fn);       // pass 1: signatures
+        foreach (var fn in node.Functions) fn.Accept(this);     // pass 2: bodies
         return default;
     }
 
-    public LLVMValueRef VisitFnDeclaration(FnDeclaration node)
+    private void DeclareFunction(FnDeclaration node)
     {
         var paramTypes = node.Params
             .Select(p => ResolveType(p.Type))
             .ToArray();
         var fnType = LLVMTypeRef.CreateFunction(ResolveType(node.ReturnType), paramTypes);
         var fn = _module.AddFunction(node.Name, fnType);
+        var key = new CallableKey("", node.Name, node.Params.Count);
+        _functions[key] = new Callable(fn, fnType);
+    }
+
+    public LLVMValueRef VisitFnDeclaration(FnDeclaration node)
+    {
+        var key = new CallableKey("", node.Name, node.Params.Count);
+        var fn = _functions[key].Fn;
+        var paramTypes = node.Params
+            .Select(p => ResolveType(p.Type))
+            .ToArray();
         _builder.PositionAtEnd(fn.AppendBasicBlock("entry"));
         _symbols.Clear();
         for (var i = 0; i < node.Params.Count; i++)
@@ -141,6 +154,17 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     public LLVMValueRef VisitCast(CastExpr node)
     {
         return _builder.EmitCast(node.Value.Accept(this), ResolveType(node.Target));
+    }
+
+    public LLVMValueRef VisitCall(CallExpr node)
+    {
+        var args = node.Args
+            .Select(arg => arg.Accept(this))
+            .ToArray();
+        var key = new CallableKey("", node.Callee, args.Length);
+        if (!_functions.TryGetValue(key, out var target))
+            throw new NotSupportedException($"no function '{node.Callee}' taking {args.Length} args");
+        return _builder.BuildCall2(target.Signature, target.Fn, args, "call");
     }
 
     public LLVMValueRef VisitBinary(BinaryExpr node)
