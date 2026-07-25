@@ -21,9 +21,6 @@
         <None Update="tests\sample-script.ex">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
-        <None Update="tests\codegen\return-literal.ex">
-          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </None>
     </ItemGroup>
 
 </Project>
