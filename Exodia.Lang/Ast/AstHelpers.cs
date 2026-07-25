@@ -4,17 +4,17 @@ namespace Exodia.Lang.Ast;
 
 public static class AstHelpers
 {
-    public static LLVMTypeRef MapPrimitiveType(string name) => name switch
+    public static LLVMTypeRef MapPrimitiveType(LLVMContextRef ctx, string name) => name switch
     {
-        "int8"  or "uint8"  => LLVMTypeRef.Int8,
-        "int16" or "uint16" => LLVMTypeRef.Int16,
-        "int32" or "uint32" => LLVMTypeRef.Int32,
-        "int64" or "uint64" => LLVMTypeRef.Int64,
-        "bool"              => LLVMTypeRef.Int1,
-        "char"              => LLVMTypeRef.Int32,
-        "float"             => LLVMTypeRef.Float,
-        "double"            => LLVMTypeRef.Double,
-        "void"              => LLVMTypeRef.Void,
+        "int8"  or "uint8"  => ctx.Int8Type,
+        "int16" or "uint16" => ctx.Int16Type,
+        "int32" or "uint32" => ctx.Int32Type,
+        "int64" or "uint64" => ctx.Int64Type,
+        "bool"              => ctx.Int1Type,
+        "char"              => ctx.Int32Type,
+        "float"             => ctx.FloatType,
+        "double"            => ctx.DoubleType,
+        "void"              => ctx.VoidType,
         _ => throw new NotSupportedException($"Type '{name}' not supported in codegen")
     };
     

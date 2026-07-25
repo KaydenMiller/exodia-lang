@@ -1,3 +1,5 @@
+using LLVMSharp.Interop;
+
 namespace Exodia.Lang.Test;
 
 /// <summary>
@@ -27,10 +29,19 @@ public class FixtureTests
 
     [Test]
     [MethodDataSource(nameof(CodegenFixtures))]
-    [DisplayName("Compiles $fixture to LLVM IR")]
-    public async Task CompilesToIr(string fixture)
+    [DisplayName("Emits well-formed IR for $fixture")]
+    public async Task EmitsWellFormedIr(string fixture)
     {
-        var ir = Pipeline.Compile(Fixtures.Load(fixture));
-        await Assert.That(ir).Contains("define");
+        var module = Pipeline.CompileToModule(Fixtures.Load(fixture));
+
+        // Surface the emitted IR in the test's captured output so it's viewable per-test
+        // (Rider shows it for passing tests; the CLI runner shows it on failure). Set
+        // EXODIA_DUMP_IR=1 to also dump .ll files for CLI-side inspection of passing runs.
+        var ir = module.PrintToString();
+        TestContext.Current!.Output.WriteLine(ir);
+        IrArtifacts.Write(fixture, ir);
+
+        var ok = module.TryVerify(LLVMVerifierFailureAction.LLVMReturnStatusAction, out var message);
+        await Assert.That(ok).IsTrue().Because($"LLVM verifier rejected the IR: {message}");
     }
 }

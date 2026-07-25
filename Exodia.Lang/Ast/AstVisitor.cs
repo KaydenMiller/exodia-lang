@@ -60,11 +60,12 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     private readonly Dictionary<string, EnumDeclaration> _enumTemplates = [];         // generic enums: parked until instantiated
     private readonly Dictionary<string, EnumDeclaration> _enumInstances = [];         // mangled ("Option$float") -> its template
     private LLVMTypeRef? _expectedType;                                               // target type driving construction (form C)
-    
+    private readonly LLVMContextRef _ctx;
     
     public AstVisitor(LLVMModuleRef module)
     {
         _module = module;
+        _ctx = module.Context;
         _builder = _module.Context.CreateBuilder();
     }
 
@@ -220,7 +221,7 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     private void EmitVTable(ImplDeclaration impl)
     {
         var slotOrder = _interfaces[impl.InterfaceName].Methods;
-        var ptrType = LLVMTypeRef.CreatePointer(LLVMTypeRef.Int8, 0);
+        var ptrType = LLVMTypeRef.CreatePointer(_ctx.Int8Type, 0);
         var slots = slotOrder
             .Select(sig =>
             {
@@ -241,7 +242,7 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     {
         if (_dynTypes.TryGetValue(interfaceName, out var t)) 
             return t;
-        var ptrType = LLVMTypeRef.CreatePointer(LLVMTypeRef.Int8, 0);
+        var ptrType = LLVMTypeRef.CreatePointer(_ctx.Int8Type, 0);
         var dyn = _module.Context.CreateNamedStruct($"dyn.{interfaceName}");
         dyn.StructSetBody([ptrType, ptrType], false);   // { data ptr, vtable ptr }
         _dynTypes[interfaceName] = dyn;
@@ -250,7 +251,7 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
 
     private LLVMValueRef EmitDynCall(LLVMValueRef fatPtrAddr, LLVMTypeRef dynType, MethodCall node)
     {
-        var ptrType = LLVMTypeRef.CreatePointer(LLVMTypeRef.Int8, 0);
+        var ptrType = LLVMTypeRef.CreatePointer(_ctx.Int8Type, 0);
         var interfaceName = dynType.StructName["dyn.".Length..];          // "%dyn.IShape".StructName -> "IShape"
         var iface = _interfaces[interfaceName];
 
@@ -266,7 +267,7 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         // (c) load the function pointer from vtable[slot]
         var llvmValueRefs = new[]
         {
-            LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, (ulong)slot.i)
+            LLVMValueRef.CreateConstInt(_ctx.Int32Type, (ulong)slot.i)
         };
         var slotAddr = _builder.BuildInBoundsGEP2(ptrType, vtable, llvmValueRefs, "vtable.slot");
         var fnPtr    = _builder.BuildLoad2(ptrType, slotAddr, "fn");
@@ -309,7 +310,7 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     // An enum lowers to { i32 tag, ...payload slots for every variant } (option A: sum-of-payloads).
     private void RegisterEnum(EnumDeclaration node)
     {
-        var fieldTypes = new List<LLVMTypeRef> { LLVMTypeRef.Int32 };   // slot 0 = discriminant
+        var fieldTypes = new List<LLVMTypeRef> { _ctx.Int32Type };   // slot 0 = discriminant
         var variants = new Dictionary<string, EnumVariantInfo>();
         uint index = 1;
         var tag = 0;
@@ -387,7 +388,7 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     private LLVMValueRef EmitEnumConstruct(EnumInfo info, EnumVariantInfo variant, LLVMValueRef[] args)
     {
         var value = info.Type.Undef;
-        value = _builder.BuildInsertValue(value, LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, (ulong)variant.Tag), 0, "tag");
+        value = _builder.BuildInsertValue(value, LLVMValueRef.CreateConstInt(_ctx.Int32Type, (ulong)variant.Tag), 0, "tag");
         for (var i = 0; i < args.Length; i++)
             value = _builder.BuildInsertValue(value, args[i], variant.Payload[i].Index, "payload");
         return value;
@@ -638,15 +639,15 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     // binding patterns always match.
     private LLVMValueRef TestPattern(Pattern pattern, LLVMValueRef tag, EnumInfo info) => pattern switch
     {
-        WildcardPattern                                         => LLVMValueRef.CreateConstInt(LLVMTypeRef.Int1, 1),
+        WildcardPattern                                         => LLVMValueRef.CreateConstInt(_ctx.Int1Type, 1),
         NamePattern n when info.Variants.TryGetValue(n.Name, out var pv) => TagEquals(tag, pv.Tag),  // payload-less variant (None)
-        NamePattern                                             => LLVMValueRef.CreateConstInt(LLVMTypeRef.Int1, 1),  // a binding
+        NamePattern                                             => LLVMValueRef.CreateConstInt(_ctx.Int1Type, 1),  // a binding
         VariantPattern v                                        => TagEquals(tag, info.Variants[v.VariantName].Tag),
         _ => throw new NotSupportedException($"pattern {pattern} not supported")
     };
 
     private LLVMValueRef TagEquals(LLVMValueRef tag, int expected) =>
-        _builder.BuildICmp(LLVMIntPredicate.LLVMIntEQ, tag, LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, (ulong)expected), "tag.eq");
+        _builder.BuildICmp(LLVMIntPredicate.LLVMIntEQ, tag, LLVMValueRef.CreateConstInt(_ctx.Int32Type, (ulong)expected), "tag.eq");
 
     // Bind whatever names the (matched) pattern introduces: a bare binding binds the whole value;
     // a variant pattern extracts each payload slot into its sub-pattern's name.
@@ -933,8 +934,8 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         _builder.BuildBr(mergeBB);
 
         _builder.PositionAtEnd(mergeBB);
-        var phi = _builder.BuildPhi(LLVMTypeRef.Int1, isAnd ? "and" : "or");
-        var shortCircuit = LLVMValueRef.CreateConstInt(LLVMTypeRef.Int1, isAnd ? 0UL : 1UL);
+        var phi = _builder.BuildPhi(_ctx.Int1Type, isAnd ? "and" : "or");
+        var shortCircuit = LLVMValueRef.CreateConstInt(_ctx.Int1Type, isAnd ? 0UL : 1UL);
         phi.AddIncoming([shortCircuit, right], [startBB, rhsEndBB], 2);
         return phi;
     }
@@ -972,13 +973,13 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     }
 
     public LLVMValueRef VisitIntLiteral(IntLiteral node)
-        => LLVMValueRef.CreateConstInt(node.Type is { } t ? ResolveType(t) : LLVMTypeRef.Int32, node.Value);
+        => LLVMValueRef.CreateConstInt(node.Type is { } t ? ResolveType(t) : _ctx.Int32Type, node.Value);
 
     public LLVMValueRef VisitFloatLiteral(FloatLiteral node)
-        => LLVMValueRef.CreateConstReal(node.Type is { } t ? ResolveType(t) : LLVMTypeRef.Double, node.Value);
+        => LLVMValueRef.CreateConstReal(node.Type is { } t ? ResolveType(t) : _ctx.DoubleType, node.Value);
 
     public LLVMValueRef VisitBoolLiteral(BoolLiteral node)
-        => LLVMValueRef.CreateConstInt(LLVMTypeRef.Int1, node.Value ? 1UL : 0UL);
+        => LLVMValueRef.CreateConstInt(_ctx.Int1Type, node.Value ? 1UL : 0UL);
 
 #region printf
     // --- print built-in (libc printf bootstrap) ---
@@ -995,7 +996,7 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         if (ExodiaHelpers.IsFloat(type))
         {
             if (type.Kind == LLVMTypeKind.LLVMFloatTypeKind)
-                value = _builder.BuildFPExt(value, LLVMTypeRef.Double, "promote");
+                value = _builder.BuildFPExt(value, _ctx.DoubleType, "promote");
             fmt = "%f\n";
         }
         else
@@ -1004,8 +1005,8 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
             if (bits < 32)
             {
                 value = bits == 1
-                    ? _builder.BuildZExt(value, LLVMTypeRef.Int32, "promote")
-                    : _builder.BuildSExt(value, LLVMTypeRef.Int32, "promote");
+                    ? _builder.BuildZExt(value, _ctx.Int32Type, "promote")
+                    : _builder.BuildSExt(value, _ctx.Int32Type, "promote");
                 fmt = "%d\n";
             }
             else fmt = bits == 32 ? "%d\n" : "%ld\n";
@@ -1018,7 +1019,7 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     private (LLVMValueRef Fn, LLVMTypeRef Type) GetPrintf()
     {
         var printfType = LLVMTypeRef.CreateFunction(
-            LLVMTypeRef.Int32, [LLVMTypeRef.CreatePointer(LLVMTypeRef.Int8, 0)], IsVarArg: true);
+            _ctx.Int32Type, [LLVMTypeRef.CreatePointer(_ctx.Int8Type, 0)], IsVarArg: true);
         var existing = _module.GetNamedFunction("printf");
         return existing.Handle != IntPtr.Zero
             ? (existing, printfType)
@@ -1038,7 +1039,7 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     {
         NamedType n when _activeSubstitutionEnv.TryGetValue(n.Name, out var bound) => bound,  // type param -> concrete
         NamedType n when _structs.TryGetValue(n.Name, out var info) => info.Type,   // struct name -> %Struct
-        NamedType n => AstHelpers.MapPrimitiveType(n.Name),
+        NamedType n => AstHelpers.MapPrimitiveType(_ctx, n.Name),
         DynType d => GetDynType(d.InterfaceName),
         GenericType g => ResolveGenericType(g),                                     // Box<int32> -> %Box$i32
         _ => throw new NotSupportedException($"type {type} not supported yet")
