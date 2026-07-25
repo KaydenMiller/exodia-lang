@@ -4,9 +4,6 @@ namespace Exodia.Lang.Ast;
 
 public static class AstHelpers
 {
-    public static LLVMTypeRef MapPrimitiveType(ExodiaParser.TypeContext context)
-        => MapPrimitiveType(context.qualified_name().GetText());
-
     public static LLVMTypeRef MapPrimitiveType(string name) => name switch
     {
         "int8"  or "uint8"  => LLVMTypeRef.Int8,
@@ -43,13 +40,6 @@ public static class AstHelpers
         _ => throw new NotSupportedException($"float comparison '{op}'")
     };
 
-    public static LLVMValueRef ResolveLValue(this Dictionary<string, Symbol> symbols, Expr target) => target switch
-    {
-        NameRef n when symbols.TryGetValue(n.Name, out var sym) => sym.Slot,
-        NameRef n => throw new NotSupportedException($"assignment to unknown name '{n.Name}"),
-        _ => throw new NotSupportedException($"unsupported assignment target: {target}")
-    };
-    
     public static LLVMValueRef EmitCast(this LLVMBuilderRef builder, LLVMValueRef value, LLVMTypeRef target)
     {
         var source = value.TypeOf;

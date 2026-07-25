@@ -19,14 +19,8 @@ try
     var tree = parser.program();
     // Console.WriteLine(tree.ToStringTree(parser));
     
-    // LLVM
+    // LLVM: parse tree -> AST (lowering) -> IR (codegen)
     var module = LLVMModuleRef.CreateWithName("exodia");
-    
-    // -- CST Path (old) --
-    // var codegen = new CodeGenVisitor(module);
-    // codegen.Visit(tree);
-    
-    // -- AST Path (new) --
     var ast = new AstLowering().LowerProgram(tree);
     var codegen = new AstVisitor(module);
     ast.Accept(codegen);
