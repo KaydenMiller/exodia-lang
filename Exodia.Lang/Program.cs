@@ -1,5 +1,6 @@
 ﻿using Antlr4.Runtime;
 using Exodia.Lang;
+using Exodia.Lang.Ast;
 using LLVMSharp.Interop;
 
 try
@@ -20,8 +21,16 @@ try
     
     // LLVM
     var module = LLVMModuleRef.CreateWithName("exodia");
-    var codegen = new CodeGenVisitor(module);
-    codegen.Visit(tree);
+    
+    // -- CST Path (old) --
+    // var codegen = new CodeGenVisitor(module);
+    // codegen.Visit(tree);
+    
+    // -- AST Path (new) --
+    var ast = new AstLowering().LowerProgram(tree);
+    var codegen = new AstVisitor(module);
+    ast.Accept(codegen);
+
     Console.WriteLine(module.PrintToString());
 }
 catch (Exception ex)
