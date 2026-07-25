@@ -24,6 +24,7 @@ CLASS: 'class' ;
 INTERFACE: 'interface' ;
 IMPL: 'impl' ;
 ENUM: 'enum' ;
+EXTERN: 'extern' ;
 NAMESPACE: 'namespace' ;
 EXTENDS: 'extends' ;
 THIS: 'this' ;
@@ -292,7 +293,7 @@ block_statement
 // FUNCTIONS
 
 function_declaration
-    : accessability_modifier* FN identifier type_parameters? '(' formal_parameter_list? ')' COLON type where_clause* function_body
+    : accessability_modifier* EXTERN? FN identifier type_parameters? '(' formal_parameter_list? ')' COLON type where_clause* (function_body | SEMI)
     ;
 
 function_body

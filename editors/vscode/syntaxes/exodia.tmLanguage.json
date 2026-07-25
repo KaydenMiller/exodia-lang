@@ -38,7 +38,7 @@
         },
         {
           "name": "storage.type.exodia",
-          "match": "\\b(fn|struct|class|interface|impl|enum|namespace|ctor)\\b"
+          "match": "\\b(fn|struct|class|interface|extern|impl|enum|namespace|ctor)\\b"
         },
         {
           "name": "storage.modifier.exodia",
@@ -120,7 +120,7 @@
       "patterns": [
         {
           "name": "support.type.primitive.exodia",
-          "match": "\\b(int8|int16|int32|int64|uint8|uint16|uint32|uint64|float|double|bool|char|void)\\b"
+          "match": "\\b(int8|int16|int32|int64|uint8|uint16|uint32|uint64|float|double|cstr|bool|char|void)\\b"
         },
         {
           "name": "entity.name.type.exodia",

@@ -22,6 +22,7 @@ public interface IAstVisitor<T>
     T VisitIntLiteral(IntLiteral node);
     T VisitFloatLiteral(FloatLiteral node);
     T VisitBoolLiteral(BoolLiteral node);
+    T VisitStringLiteral(StringLiteral node);
     T VisitNew(NewExpr node);
     T VisitFieldAccess(FieldAccess node);
     T VisitMethodCall(MethodCall node);
@@ -93,7 +94,7 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
             .ToList();
         
         foreach (var fn in concreteFns) DeclareFunction(fn);       // phase 2: function signatures
-        foreach (var fn in concreteFns) fn.Accept(this);           // phase 3a: function bodies
+        foreach (var fn in concreteFns.Where(f => !f.IsExtern)) fn.Accept(this);           // phase 3a: function bodies only
         foreach (var s in node.Structs.Where(s => s.TypeParams.Count == 0))
             EmitStructBodies(s);                                     // phase 3b: concrete struct ctor/method bodies
         foreach (var impl in node.Impls) EmitImpl(impl);              // phase 3c: impl method bodies
@@ -472,6 +473,9 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         }
     }
 
+    public LLVMValueRef VisitStringLiteral(StringLiteral node) =>
+        _builder.BuildGlobalStringPtr(node.Value, "str");
+
     public LLVMValueRef VisitNew(NewExpr node)
     {
         var args = node.Args.Select(a => a.Accept(this)).ToArray();
@@ -725,7 +729,7 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
             .Select(p => ResolveType(p.Type))
             .ToArray();
         var fnType = LLVMTypeRef.CreateFunction(ResolveType(node.ReturnType), paramTypes);
-        var fn = _module.AddFunction(node.Name, fnType);
+        var fn = _module.AddFunction(node.LinkName ?? node.Name, fnType);
         var key = new CallableKey("", node.Name, node.Params.Count);
         _functions[key] = new Callable(fn, fnType);
     }
@@ -745,7 +749,7 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
             _builder.BuildStore(fn.GetParam((uint)i), slot);
             _symbols[node.Params[i].Name] = new Symbol(slot, paramTypes[i]);
         }
-        node.Body.Accept(this);
+        node.Body!.Accept(this);
         // if control falls off the end without a terminator (e.g. a dead if-merge block where
         // both arms returned), cap it -- keeps IR valid instead of an empty, terminatorless block.
         if (_builder.InsertBlock.Terminator.Handle == IntPtr.Zero)

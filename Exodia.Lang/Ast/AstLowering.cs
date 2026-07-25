@@ -139,12 +139,20 @@ public class AstLowering
     }
 
     private FnDeclaration LowerFunction(ExodiaParser.Function_declarationContext context)
-        => new(context.identifier().GetText(),
-                LowerTypeParams(context.type_parameters(), context.where_clause()),
-               LowerParams(context.formal_parameter_list()),
-               LowerType(context.type()),
-               LowerBody(context.function_body()),
-               Span(context));
+    {
+        var isExtern = context.EXTERN() is not null;
+        if (isExtern && context.type_parameters() is not null)
+            throw new NotSupportedException("extern functions cannot be generic (no single C symbol)");
+        return new(context.identifier().GetText(),
+            LowerTypeParams(context.type_parameters(), context.where_clause()),
+            LowerParams(context.formal_parameter_list()),
+            LowerType(context.type()),
+            isExtern ? null : LowerBody(context.function_body()),
+            isExtern,
+            null,
+            Span(context)
+            );
+    }
 
     private StructDeclaration LowerStruct(ExodiaParser.Struct_declarationContext context)
     {
@@ -433,6 +441,26 @@ public class ExpressionLowering : ExodiaBaseVisitor<Expr>
                 : new NamePattern(name, span);                    // None (variant) or x (binding) -- resolved at match time
         }
         throw new NotSupportedException($"literal patterns not supported yet: {context.GetText()}");
+    }
+
+    public override Expr VisitString_literal(ExodiaParser.String_literalContext context)
+    {
+        var raw = context.GetText();
+        var inner = raw.Substring(1, raw.Length - 2); // drop surrounding quotes
+        var sb = new System.Text.StringBuilder();
+        for (var i = 0; i < inner.Length; i++)
+            sb.Append(inner[i] == '\\' && i + 1 < inner.Length
+                ? inner[++i] switch
+                {
+                    'n' => '\n',
+                    'r' => '\r',
+                    't' => '\t',
+                    '0' => '\0',
+                    var c => c
+                }
+                : inner[i]
+            );
+        return new StringLiteral(sb.ToString(), AstLowering.Span(context));
     }
 
     public override Expr VisitPostfix_expression(ExodiaParser.Postfix_expressionContext context)

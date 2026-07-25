@@ -93,7 +93,15 @@ public record ThisExpr(TextSpan TextSpan) : Expr(TextSpan)
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitThis(this);
 }
 
-public record FnDeclaration(string Name, IReadOnlyList<TypeParam> TypeParams, IReadOnlyList<Param> Params, TypeRef ReturnType, Block Body, TextSpan TextSpan) : AstNode(TextSpan)
+public record FnDeclaration(
+    string Name,
+    IReadOnlyList<TypeParam> TypeParams,
+    IReadOnlyList<Param> Params,
+    TypeRef ReturnType, 
+    Block? Body,
+    bool IsExtern,
+    string? LinkName,
+    TextSpan TextSpan) : AstNode(TextSpan)
 {
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitFnDeclaration(this);
 }
@@ -171,4 +179,9 @@ public record FloatLiteral(double Value, TypeRef? Type, TextSpan TextSpan) : Exp
 public record BoolLiteral(bool Value, TextSpan TextSpan) : Expr(TextSpan)
 {
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitBoolLiteral(this);
+}
+
+public record StringLiteral(string Value, TextSpan TextSpan) : Expr(TextSpan)
+{
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitStringLiteral(this);
 }
