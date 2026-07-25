@@ -424,7 +424,7 @@ argument
     ;
     
 new_expression
-    : NEW qualified_name ('.' identifier)? arguments
+    : NEW qualified_name type_arguments? ('.' identifier)? arguments
     ;
     
 match_expression

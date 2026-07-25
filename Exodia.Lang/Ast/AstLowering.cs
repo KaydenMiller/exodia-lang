@@ -9,9 +9,16 @@ public class AstLowering
     private readonly ExpressionLowering _expressions = new();
     
     internal static TypeRef LowerType(ExodiaParser.TypeContext context)
-        => context.DYN() is not null
-            ? new DynType(context.qualified_name().GetText(), Span(context))
-            : new NamedType(context.qualified_name().GetText(), Span(context));
+    {
+        if (context.DYN() is not null)
+            return new DynType(context.qualified_name().GetText(), Span(context));
+        if (context.type_arguments() is { } targs)
+            return new GenericType(
+                context.qualified_name().GetText(),
+                targs.type().Select(LowerType).ToList(),
+                Span(context));
+        return new NamedType(context.qualified_name().GetText(), Span(context));
+    }
 
     internal static TextSpan Span(ParserRuleContext context)
         => new(context.Start.StartIndex, context.Stop.StopIndex - context.Start.StartIndex + 1);
@@ -352,8 +359,12 @@ public class ExpressionLowering : ExodiaBaseVisitor<Expr>
         var args = ExodiaHelpers.CollectArgs(context.arguments().argument_list())
             .Select(a => Visit(a.assignment_expression()))
             .ToList();
+        var typeArgs = context.type_arguments() is { } targs      // explicit new Box<int32>(...)
+            ? targs.type().Select(AstLowering.LowerType).ToList()
+            : new List<TypeRef>();
         return new NewExpr(
             context.qualified_name().GetText(),
+            typeArgs,
             context.identifier()?.GetText(),          // named-ctor part (new T.Named(...))
             args,
             AstLowering.Span(context));

@@ -17,6 +17,9 @@ public abstract record Expr(TextSpan TextSpan) : AstNode(TextSpan);
 public abstract record TypeRef(TextSpan TextSpan);
 public record NamedType(string Name, TextSpan TextSpan) : TypeRef(TextSpan);
 public record DynType(string InterfaceName, TextSpan TextSpan) : TypeRef(TextSpan);
+// A generic type application written in a type position, e.g. `Box<int32>` or `Box<T>`.
+// TypeArgs may themselves be type parameters (resolved via the active substitution env).
+public record GenericType(string Name, IReadOnlyList<TypeRef> TypeArgs, TextSpan TextSpan) : TypeRef(TextSpan);
 
 public record TypeParam(string Name, IReadOnlyList<string> Bounds, TextSpan TextSpan);
 
@@ -51,7 +54,7 @@ public record StructDeclaration(
     TextSpan TextSpan);
 
 // --- struct expressions (visited) ---
-public record NewExpr(string StructName, string? ConstructorName, IReadOnlyList<Expr> Args, TextSpan TextSpan) : Expr(TextSpan)
+public record NewExpr(string StructName, IReadOnlyList<TypeRef> TypeArgs, string? ConstructorName, IReadOnlyList<Expr> Args, TextSpan TextSpan) : Expr(TextSpan)
 {
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitNew(this);
 }

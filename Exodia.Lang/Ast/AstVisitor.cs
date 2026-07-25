@@ -43,6 +43,13 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     private readonly Dictionary<CallableKey, FnDeclaration> _fnTemplates = [];
     private readonly Dictionary<string, Callable> _instances = [];
     private Dictionary<string, LLVMTypeRef> _activeSubstitutionEnv = [];
+    private readonly Dictionary<string, StructDeclaration> _structTemplates = [];   // generic structs: parked until instantiated
+    // struct declaration is builder-free (safe eagerly), but body emission needs the builder,
+    // so instantiated structs queue their ctor/method bodies here for the post-body drain phase.
+    private readonly List<(StructDeclaration Concrete, Dictionary<string, LLVMTypeRef> Env)> _pendingStructBodies = [];
+    // reverse map: mangled instance name ("Box$i32") -> what template + type-args produced it.
+    // lets structural inference recover T from a concrete argument of type %Box$i32.
+    private readonly Dictionary<string, (StructDeclaration Template, Dictionary<string, LLVMTypeRef> Env)> _structInstances = [];
     
     
     public AstVisitor(LLVMModuleRef module)
@@ -53,7 +60,9 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
 
     public LLVMValueRef VisitProgram(ProgramNode node)
     {
-        foreach (var s in node.Structs) RegisterStruct(s);            // phase 1: struct types + ctor/method decls
+        foreach (var s in node.Structs)                               // phase 1: struct types + ctor/method decls
+            if (s.TypeParams.Count > 0) _structTemplates[s.Name] = s; //   generic -> park (no LLVM layout until T known)
+            else RegisterStruct(s);
         foreach (var i in node.Interfaces) _interfaces[i.Name] = i;   // phase 1b: capture interfaces (dyn/B; no IR)
         foreach (var impl in node.Impls) DeclareImpl(impl);           // phase 1c: impl method signatures
         foreach (var impl in node.Impls) EmitVTable(impl);
@@ -71,8 +80,10 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         
         foreach (var fn in concreteFns) DeclareFunction(fn);       // phase 2: function signatures
         foreach (var fn in concreteFns) fn.Accept(this);           // phase 3a: function bodies
-        foreach (var s in node.Structs) EmitStructBodies(s);          // phase 3b: struct ctor/method bodies
+        foreach (var s in node.Structs.Where(s => s.TypeParams.Count == 0))
+            EmitStructBodies(s);                                     // phase 3b: concrete struct ctor/method bodies
         foreach (var impl in node.Impls) EmitImpl(impl);              // phase 3c: impl method bodies
+        DrainStructBodies();                                          // phase 3d: emit instantiated generic-struct bodies
         return default;
     }
 
@@ -112,6 +123,84 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
             _builder.PositionAtEnd(savedBlock);
 
         return instance;
+    }
+
+    public static string MangleStruct(StructDeclaration template, Dictionary<string, LLVMTypeRef> env) =>
+        $"{template.Name}${string.Join("$", template.TypeParams.Select(tp => env[tp.Name].ToString()))}";
+
+    // Turn a parked generic struct into a concrete one under `env` (T -> i32).
+    // Only DECLARES here (named type + field layout + ctor/method signatures) -- builder-free,
+    // so it is safe to call from any phase, including while resolving another type. Bodies are
+    // queued and emitted later by DrainStructBodies (they need the builder).
+    private StructInfo InstantiateStruct(StructDeclaration template, Dictionary<string, LLVMTypeRef> env)
+    {
+        var mangled = MangleStruct(template, env);
+        if (_structs.TryGetValue(mangled, out var cached))
+            return cached;                                   // instantiate each (struct, type-args) once
+
+        var concrete = template with { Name = mangled, TypeParams = [] };
+
+        var savedEnv = _activeSubstitutionEnv;
+        _activeSubstitutionEnv = env;
+        RegisterStruct(concrete);                            // %Box$i32 + field layout + ctor/method signatures
+        _activeSubstitutionEnv = savedEnv;
+
+        _structInstances[mangled] = (template, env);         // record for structural inference
+        _pendingStructBodies.Add((concrete, env));           // emit ctor/method bodies in the drain phase
+        return _structs[mangled];
+    }
+
+    private void DrainStructBodies()
+    {
+        // Emitting one struct's bodies may instantiate more structs (nested `new`), which append
+        // to the queue -- so loop until it stops growing.
+        while (_pendingStructBodies.Count > 0)
+        {
+            var (concrete, env) = _pendingStructBodies[0];
+            _pendingStructBodies.RemoveAt(0);
+            var savedEnv = _activeSubstitutionEnv;
+            _activeSubstitutionEnv = env;
+            EmitStructBodies(concrete);
+            _activeSubstitutionEnv = savedEnv;
+        }
+    }
+
+    // Infer a generic struct's type arguments from `new` argument types, matching against the
+    // chosen constructor's params (or the fields, for positional init).
+    private Dictionary<string, LLVMTypeRef> InferStructTypeArgs(StructDeclaration template, string ctorName, LLVMTypeRef[] argTypes)
+    {
+        var ctor = template.Constructors.FirstOrDefault(c => (c.Name ?? "") == ctorName && c.Params.Count == argTypes.Length);
+        IReadOnlyList<TypeRef> paramTypes =
+            ctor is not null                                       ? ctor.Params.Select(p => p.Type).ToList()
+            : ctorName == "" && argTypes.Length == template.Fields.Count ? template.Fields.Select(f => f.Type).ToList()
+            : throw new NotSupportedException($"cannot infer type arguments for '{template.Name}': no constructor '{ctorName}' with {argTypes.Length} args");
+
+        var typeParamNames = template.TypeParams.Select(tp => tp.Name).ToHashSet();
+        var env = new Dictionary<string, LLVMTypeRef>();
+        for (var i = 0; i < paramTypes.Count; i++)
+            Unify(paramTypes[i], argTypes[i], typeParamNames, env);
+        foreach (var tp in template.TypeParams)
+            if (!env.ContainsKey(tp.Name))
+                throw new NotSupportedException($"could not infer type argument '{tp.Name}' for struct '{template.Name}'");
+        return env;
+    }
+
+    // Match a declared parameter type against a concrete argument's LLVM type, binding any of
+    // `ours` (this template's type params) that appear. Handles bare `T` and nested `Box<T>`.
+    private void Unify(TypeRef paramType, LLVMTypeRef argType, HashSet<string> ours, Dictionary<string, LLVMTypeRef> env)
+    {
+        switch (paramType)
+        {
+            case NamedType n when ours.Contains(n.Name):                        // x: T           -> T = argType
+                env[n.Name] = argType;
+                break;
+            case GenericType g when _structInstances.TryGetValue(argType.StructName, out var inst) && inst.Template.Name == g.Name:
+                // x: Box<T> matched against a %Box$i32 arg -> recover Box's env, then unify each arg.
+                for (var i = 0; i < g.TypeArgs.Count; i++)
+                    Unify(g.TypeArgs[i], inst.Env[inst.Template.TypeParams[i].Name], ours, env);
+                break;
+            // concrete param (e.g. int32) or non-inferable shape: nothing to bind.
+        }
     }
 
     // An `impl I for T { … }` just adds methods to T -- reuse the struct-method machinery.
@@ -283,20 +372,31 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
 
     public LLVMValueRef VisitNew(NewExpr node)
     {
-        if (!_structs.TryGetValue(node.StructName, out var info))
-            throw new NotSupportedException($"unknown struct '{node.StructName}'");
         var args = node.Args.Select(a => a.Accept(this)).ToArray();
         var ctorName = node.ConstructorName ?? "";
-        if (_constructors.TryGetValue(new CallableKey(node.StructName, ctorName, args.Length), out var ctor))
-            return _builder.BuildCall2(ctor.Signature, ctor.Fn, args, $"{node.StructName}.new");
+
+        if (!_structs.TryGetValue(node.StructName, out var info))
+        {
+            // generic struct: infer type args from the constructor arguments, then instantiate.
+            if (!_structTemplates.TryGetValue(node.StructName, out var template))
+                throw new NotSupportedException($"unknown struct '{node.StructName}'");
+            var env = node.TypeArgs.Count > 0                                          // explicit new Box<int32>(...)
+                ? BuildStructEnv(template, node.TypeArgs)
+                : InferStructTypeArgs(template, ctorName, args.Select(a => a.TypeOf).ToArray());  // inferred new Box(...)
+            info = InstantiateStruct(template, env);
+        }
+        var structName = info.Type.StructName;                                        // "Vec" or mangled "Box$i32"
+
+        if (_constructors.TryGetValue(new CallableKey(structName, ctorName, args.Length), out var ctor))
+            return _builder.BuildCall2(ctor.Signature, ctor.Fn, args, $"{structName}.new");
         if (ctorName == "" && args.Length == info.Fields.Count)                       // positional fallback
         {
             var value = info.Type.Undef;
             for (var i = 0; i < args.Length; i++)
-                value = _builder.BuildInsertValue(value, args[i], (uint)i, $"{node.StructName}.f{i}");
+                value = _builder.BuildInsertValue(value, args[i], (uint)i, $"{structName}.f{i}");
             return value;
         }
-        throw new NotSupportedException($"'{node.StructName}' has no constructor '{ctorName}' taking {args.Length} args");
+        throw new NotSupportedException($"'{structName}' has no constructor '{ctorName}' taking {args.Length} args");
     }
 
     public LLVMValueRef VisitFieldAccess(FieldAccess node)
@@ -613,6 +713,7 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     public LLVMValueRef VisitBoolLiteral(BoolLiteral node)
         => LLVMValueRef.CreateConstInt(LLVMTypeRef.Int1, node.Value ? 1UL : 0UL);
 
+#region printf
     // --- print built-in (libc printf bootstrap) ---
     private readonly Dictionary<string, LLVMValueRef> _formats = [];
 
@@ -664,6 +765,7 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         _formats[fmt] = g;
         return g;
     }
+#endregion
 
     private LLVMTypeRef ResolveType(TypeRef type) => type switch
     {
@@ -671,7 +773,29 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         NamedType n when _structs.TryGetValue(n.Name, out var info) => info.Type,   // struct name -> %Struct
         NamedType n => AstHelpers.MapPrimitiveType(n.Name),
         DynType d => GetDynType(d.InterfaceName),
+        GenericType g => ResolveGenericType(g),                                     // Box<int32> -> %Box$i32
         _ => throw new NotSupportedException($"type {type} not supported yet")
     };
+
+    // Resolve an explicit generic application (`Box<int32>`, or `Box<T>` under an active env)
+    // to its instantiated LLVM struct type.
+    private LLVMTypeRef ResolveGenericType(GenericType g)
+    {
+        if (!_structTemplates.TryGetValue(g.Name, out var template))
+            throw new NotSupportedException($"'{g.Name}' is not a generic struct");
+        return InstantiateStruct(template, BuildStructEnv(template, g.TypeArgs)).Type;
+    }
+
+    // Map explicit type arguments (from `Box<int32>` or `new Box<int32>(...)`) to a substitution
+    // env. Args may themselves be type params, resolved via the currently-active env.
+    private Dictionary<string, LLVMTypeRef> BuildStructEnv(StructDeclaration template, IReadOnlyList<TypeRef> typeArgs)
+    {
+        if (template.TypeParams.Count != typeArgs.Count)
+            throw new NotSupportedException($"'{template.Name}' expects {template.TypeParams.Count} type argument(s), got {typeArgs.Count}");
+        var env = new Dictionary<string, LLVMTypeRef>();
+        for (var i = 0; i < template.TypeParams.Count; i++)
+            env[template.TypeParams[i].Name] = ResolveType(typeArgs[i]);
+        return env;
+    }
 }
 
