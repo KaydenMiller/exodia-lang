@@ -1,4 +1,3 @@
-using LLVMSharp;
 using LLVMSharp.Interop;
 
 namespace Exodia.Lang.Ast;
@@ -8,6 +7,8 @@ public interface IAstVisitor<T>
 {
     T VisitProgram(ProgramNode node);
     T VisitFnDeclaration(FnDeclaration node);
+    T VisitVariableDeclaration(VariableDeclaration node);
+    T VisitNameRef(NameRef node);
     T VisitBlock(Block node);
     T VisitIf(IfStatement node);
     T VisitReturn(ReturnStatement node);
@@ -21,6 +22,7 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
 {
     public readonly LLVMModuleRef _module;
     public readonly LLVMBuilderRef _builder;
+    private readonly Dictionary<string, Symbol> _symbols = [];
 
     public AstVisitor(LLVMModuleRef module)
     {
@@ -37,11 +39,40 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
 
     public LLVMValueRef VisitFnDeclaration(FnDeclaration node)
     {
-        var fnType = LLVMTypeRef.CreateFunction(ResolveType(node.ReturnType), []);
+        var paramTypes = node.Params
+            .Select(p => ResolveType(p.Type))
+            .ToArray();
+        var fnType = LLVMTypeRef.CreateFunction(ResolveType(node.ReturnType), paramTypes);
         var fn = _module.AddFunction(node.Name, fnType);
         _builder.PositionAtEnd(fn.AppendBasicBlock("entry"));
+        _symbols.Clear();
+        for (var i = 0; i < node.Params.Count; i++)
+        {
+            var slot = _builder.BuildAlloca(paramTypes[i], node.Params[i].Name);
+            _builder.BuildStore(fn.GetParam((uint)i), slot);
+            _symbols[node.Params[i].Name] = new Symbol(slot, paramTypes[i]);
+        }
         node.Body.Accept(this);
         return fn;
+    }
+
+    public LLVMValueRef VisitVariableDeclaration(VariableDeclaration node)
+    {
+        var value = node.Initializer.Accept(this);
+        var type = node.Type is not null
+            ? ResolveType(node.Type)
+            : value.TypeOf;
+        var slot = _builder.BuildAlloca(type, node.Name);
+        _builder.BuildStore(value, slot);
+        _symbols[node.Name] = new Symbol(slot, type);
+        return value;
+    }
+
+    public LLVMValueRef VisitNameRef(NameRef node)
+    {
+        if (_symbols.TryGetValue(node.Name, out var sym))
+            return _builder.BuildLoad2(sym.Type, sym.Slot, node.Name);
+        throw new NotSupportedException($"Unknown name '{node.Name}'");
     }
 
     public LLVMValueRef VisitBlock(Block node)

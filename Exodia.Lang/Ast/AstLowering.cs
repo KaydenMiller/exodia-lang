@@ -25,10 +25,30 @@ public class AstLowering
 
     private FnDeclaration LowerFunction(ExodiaParser.Function_declarationContext context)
     {
+        var formals = context.formal_parameter_list()
+            ?.formal_parameter() ?? [];
+        var parameters = formals
+            .Select(f => 
+                new Param(f.identifier().GetText(), LowerType(f.type()), Span(f)))
+            .ToList();
         return new FnDeclaration(
             context.identifier().GetText(),
+            parameters,
             LowerType(context.type()),
             LowerBody(context.function_body()),
+            Span(context));
+    }
+
+    private VariableDeclaration LowerVariableDeclaration(ExodiaParser.Variable_statementContext context)
+    {
+        var declaration = context.variable_declaration_list().variable_declaration();
+        var initializer = declaration.variable_initializer()
+                          ?? throw new NotSupportedException("variable without initializer not lowered yet");
+        return new VariableDeclaration(
+            declaration.identifier().GetText(),
+            context.MUT() is not null,
+            declaration.type() is {} t ? LowerType(t) : null,
+            _expressions.Visit(initializer.assignment_expression()),
             Span(context));
     }
 
@@ -55,6 +75,8 @@ public class AstLowering
             return LowerIf(ifstat);
         if (context.block_statement() is { } block)
             return LowerBlockStatement(block);
+        if (context.variable_statement() is { } var)
+            return LowerVariableDeclaration(var);
         throw new NotSupportedException($"statement not lowered yet: {context.GetText()}");
     }
 
@@ -79,6 +101,11 @@ public class AstLowering
 
 public class ExpressionLowering : ExodiaBaseVisitor<Expr>
 {
+    public override Expr VisitQualified_name(ExodiaParser.Qualified_nameContext context)
+    {
+        return new NameRef(context.GetText(), AstLowering.Span(context));
+    }
+
     public override Expr VisitNumeric_literal(ExodiaParser.Numeric_literalContext context)
     {
         var raw = context.GetText().Replace("_", ""); // strip digit separators

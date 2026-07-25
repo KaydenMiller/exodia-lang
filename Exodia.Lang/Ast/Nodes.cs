@@ -17,15 +17,27 @@ public abstract record Expr(TextSpan TextSpan) : AstNode(TextSpan);
 public abstract record TypeRef(TextSpan TextSpan);
 public record NamedType(string Name, TextSpan TextSpan) : TypeRef(TextSpan);
 
+public record Param(string Name, TypeRef Type, TextSpan TextSpan);
+
 
 public record ProgramNode(IReadOnlyList<FnDeclaration> Functions, TextSpan TextSpan) : AstNode(TextSpan)
 {
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitProgram(this);
 }
 
-public record FnDeclaration(string Name, TypeRef ReturnType, Block Body, TextSpan TextSpan) : AstNode(TextSpan)
+public record FnDeclaration(string Name, IReadOnlyList<Param> Params, TypeRef ReturnType, Block Body, TextSpan TextSpan) : AstNode(TextSpan)
 {
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitFnDeclaration(this);
+}
+
+public record VariableDeclaration(string Name, bool IsMutable, TypeRef? Type, Expr Initializer, TextSpan TextSpan) : Statement(TextSpan)
+{
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitVariableDeclaration(this);
+}
+
+public record NameRef(string Name, TextSpan TextSpan) : Expr(TextSpan)
+{
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitNameRef(this);
 }
 
 public record Block(IReadOnlyList<Statement> Statements, TextSpan TextSpan) : Statement(TextSpan)
