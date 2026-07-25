@@ -12,6 +12,8 @@ public interface IAstVisitor<T>
     T VisitBlock(Block node);
     T VisitIf(IfStatement node);
     T VisitReturn(ReturnStatement node);
+    T VisitAssignmentExpr(AssignExpr node);
+    T VisitExpressionStatement(ExpressionStatement node);
     T VisitCast(CastExpr node);
     T VisitBinary(BinaryExpr node);
     T VisitIntLiteral(IntLiteral node);
@@ -121,6 +123,19 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         if (value is null)
             return _builder.BuildRetVoid();
         return _builder.BuildRet(value.Value);
+    }
+
+    public LLVMValueRef VisitAssignmentExpr(AssignExpr node)
+    {
+        var value = node.Value.Accept(this);
+        _builder.BuildStore(value, _symbols.ResolveLValue(node.Target));
+        return value;
+    }
+
+    public LLVMValueRef VisitExpressionStatement(ExpressionStatement node)
+    {
+        node.Expression.Accept(this);
+        return default;
     }
 
     public LLVMValueRef VisitCast(CastExpr node)

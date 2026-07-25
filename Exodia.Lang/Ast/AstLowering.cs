@@ -77,6 +77,8 @@ public class AstLowering
             return LowerBlockStatement(block);
         if (context.variable_statement() is { } var)
             return LowerVariableDeclaration(var);
+        if (context.expression_statement() is { } expr)
+            return new ExpressionStatement(_expressions.Visit(expr.expression()), Span(expr));
         throw new NotSupportedException($"statement not lowered yet: {context.GetText()}");
     }
 
@@ -135,6 +137,20 @@ public class ExpressionLowering : ExodiaBaseVisitor<Expr>
         }
 
         return new IntLiteral(ulong.Parse(intDigits), AstLowering.Span(context));
+    }
+
+    public override Expr VisitAssignment_expression(ExodiaParser.Assignment_expressionContext context)
+    {
+        if (context.assignment_expression() is null)
+            return Visit(context.logical_OR_expression());
+
+        var op = context.assignment_operator().GetText();
+        if (op is not "=")
+            throw new NotSupportedException($"compound assignment '{op}' not lowered yet");
+
+        var target = Visit(context.left_hand_side_expression());
+        var value = Visit(context.assignment_expression());
+        return new AssignExpr(target, value, AstLowering.Span(context));
     }
 
     public override Expr VisitAdditive_expression(ExodiaParser.Additive_expressionContext context)

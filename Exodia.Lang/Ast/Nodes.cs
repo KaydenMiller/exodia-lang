@@ -55,6 +55,16 @@ public record ReturnStatement(Expr? Value, TextSpan TextSpan) : Statement(TextSp
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitReturn(this);
 }
 
+public record ExpressionStatement(Expr Expression, TextSpan TextSpan) : Statement(TextSpan)
+{
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitExpressionStatement(this);
+}
+
+public record AssignExpr(Expr Target, Expr Value, TextSpan TextSpan) : Expr(TextSpan)
+{
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitAssignmentExpr(this);
+}
+
 public record CastExpr(Expr Value, TypeRef Target, TextSpan TextSpan) : Expr(TextSpan)
 {
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitCast(this);
