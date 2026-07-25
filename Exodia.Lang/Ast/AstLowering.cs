@@ -9,7 +9,9 @@ public class AstLowering
     private readonly ExpressionLowering _expressions = new();
     
     internal static TypeRef LowerType(ExodiaParser.TypeContext context)
-        => new NamedType(context.qualified_name().GetText(), Span(context));
+        => context.DYN() is not null
+            ? new DynType(context.qualified_name().GetText(), Span(context))
+            : new NamedType(context.qualified_name().GetText(), Span(context));
 
     internal static TextSpan Span(ParserRuleContext context)
         => new(context.Start.StartIndex, context.Stop.StopIndex - context.Start.StartIndex + 1);
@@ -18,15 +20,41 @@ public class AstLowering
     {
         var functions = new List<FnDeclaration>();
         var structs = new List<StructDeclaration>();
+        var interfaces = new List<InterfaceDeclaration>();
+        var impls = new List<ImplDeclaration>();
         foreach (var statement in context.statement())
         {
             if (statement.function_declaration() is {} fn)
                 functions.Add(LowerFunction(fn));
             else if (statement.struct_declaration() is {} s)
                 structs.Add(LowerStruct(s));
+            else if (statement.interface_declaration() is {} i)
+                interfaces.Add(LowerInterface(i));
+            else if (statement.impl_declaration() is {} impl)
+                impls.Add(LowerImpl(impl));
         }
-        return new ProgramNode(functions, structs, Span(context));
+        
+        return new ProgramNode(functions, structs, interfaces, impls, Span(context));
     }
+
+    private MethodDeclaration LowerMethodDeclaration(ExodiaParser.Method_declarationContext m)
+        => new(m.identifier().GetText(), LowerParams(m.formal_parameter_list()), LowerType(m.type()), LowerBody(m.function_body()), Span(m));
+
+    private InterfaceDeclaration LowerInterface(ExodiaParser.Interface_declarationContext context)
+    {
+        var methods = context.interface_member()
+            .Select(member => member.method_signature())
+            .Select(s => new MethodSignature(s.identifier().GetText(), LowerParams(s.formal_parameter_list()), LowerType(s.type()), Span(s)))
+            .ToList();
+        return new InterfaceDeclaration(context.identifier().GetText(), methods, Span(context));
+    }
+
+    private ImplDeclaration LowerImpl(ExodiaParser.Impl_declarationContext context)
+        // increment A: no impl_outputs, so type(0)=interface, type(1)=target
+        => new(context.type(0).qualified_name().GetText(),
+               context.type(1).qualified_name().GetText(),
+               context.method_declaration().Select(LowerMethodDeclaration).ToList(),
+               Span(context));
 
     private static List<Param> LowerParams(ExodiaParser.Formal_parameter_listContext? list)
         => (list?.formal_parameter() ?? [])

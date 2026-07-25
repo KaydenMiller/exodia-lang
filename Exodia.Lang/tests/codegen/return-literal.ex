@@ -1,23 +1,41 @@
 fn main(): int32 {
-    const point = new Point(4);
-    print(point.x);
-    const pnt = point.scale(5);
-    print(pnt.x);
+    const cir = new Circle(5);
+    const r2 = cir.r * cir.r;
+    print(cir.area());
+    const rect = new Rect(2, 3);
+    print(rect.area());
     return 0;
 }
 
-struct Point {
+interface IAreaCalc {
+    area(): float;
+}
+
+struct Circle {
+    r: int32;    
+    ctor() {}
+    
+    ctor(r: int32) {
+        this.r = r;
+    }
+}
+impl IAreaCalc for Circle {
+    area(): float {
+        return ((this.r * this.r) as float) * 3.1415f;
+    }
+}
+
+struct Rect {
     x: int32;
     y: int32;
     
-    ctor() {}
-    
-    ctor(a: int32) {
-        this.x = a;
-        this.y = a * 2;
+    ctor(x: int32, y: int32) {
+        this.x = x;
+        this.y = y;
     }
-    
-    scale(factor: int32): Point {
-        return new Point(this.x * factor);
+}
+impl IAreaCalc for Rect {
+    area(): float {
+        return (this.x * this.y) as float;
     }
 }

@@ -16,14 +16,25 @@ public abstract record Expr(TextSpan TextSpan) : AstNode(TextSpan);
 
 public abstract record TypeRef(TextSpan TextSpan);
 public record NamedType(string Name, TextSpan TextSpan) : TypeRef(TextSpan);
+public record DynType(string InterfaceName, TextSpan TextSpan) : TypeRef(TextSpan);
 
 public record Param(string Name, TypeRef Type, TextSpan TextSpan);
 
 
-public record ProgramNode(IReadOnlyList<FnDeclaration> Functions, IReadOnlyList<StructDeclaration> Structs, TextSpan TextSpan) : AstNode(TextSpan)
+public record ProgramNode(
+    IReadOnlyList<FnDeclaration> Functions,
+    IReadOnlyList<StructDeclaration> Structs,
+    IReadOnlyList<InterfaceDeclaration> Interfaces,
+    IReadOnlyList<ImplDeclaration> Impls,
+    TextSpan TextSpan) : AstNode(TextSpan)
 {
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitProgram(this);
 }
+
+// --- interfaces / impls (data; processed by AstVisitor's phases, not visited) ---
+public record MethodSignature(string Name, IReadOnlyList<Param> Params, TypeRef ReturnType, TextSpan TextSpan);
+public record InterfaceDeclaration(string Name, IReadOnlyList<MethodSignature> Methods, TextSpan TextSpan);
+public record ImplDeclaration(string InterfaceName, string TargetType, IReadOnlyList<MethodDeclaration> Methods, TextSpan TextSpan);
 
 // --- struct declarations (data; processed by AstVisitor's 3-phase, not visited) ---
 public record FieldDeclaration(string Name, TypeRef Type, TextSpan TextSpan);

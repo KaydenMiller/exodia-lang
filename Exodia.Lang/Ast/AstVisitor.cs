@@ -37,7 +37,11 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     private readonly Dictionary<string, StructInfo> _structs = [];
     private readonly Dictionary<CallableKey, Callable> _constructors = [];
     private readonly Dictionary<CallableKey, Callable> _methods = [];
-
+    private readonly Dictionary<string, InterfaceDeclaration> _interfaces = [];   // captured for dyn (increment B); no IR
+    private readonly Dictionary<VTableKey, LLVMValueRef> _vtables = [];
+    private readonly Dictionary<string, LLVMTypeRef> _dynTypes = [];
+    
+    
     public AstVisitor(LLVMModuleRef module)
     {
         _module = module;
@@ -47,10 +51,97 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     public LLVMValueRef VisitProgram(ProgramNode node)
     {
         foreach (var s in node.Structs) RegisterStruct(s);            // phase 1: struct types + ctor/method decls
+        foreach (var i in node.Interfaces) _interfaces[i.Name] = i;   // phase 1b: capture interfaces (dyn/B; no IR)
+        foreach (var impl in node.Impls) DeclareImpl(impl);           // phase 1c: impl method signatures
+        foreach (var impl in node.Impls) EmitVTable(impl);
+        
         foreach (var fn in node.Functions) DeclareFunction(fn);       // phase 2: function signatures
         foreach (var fn in node.Functions) fn.Accept(this);           // phase 3a: function bodies
-        foreach (var s in node.Structs) EmitStructBodies(s);          // phase 3b: ctor/method bodies
+        foreach (var s in node.Structs) EmitStructBodies(s);          // phase 3b: struct ctor/method bodies
+        foreach (var impl in node.Impls) EmitImpl(impl);              // phase 3c: impl method bodies
         return default;
+    }
+
+    // An `impl I for T { … }` just adds methods to T -- reuse the struct-method machinery.
+    private void DeclareImpl(ImplDeclaration impl)
+    {
+        var structType = _structs[impl.TargetType].Type;
+        foreach (var method in impl.Methods)
+            DeclareMethod(impl.TargetType, structType, method);
+    }
+
+    private void EmitImpl(ImplDeclaration impl)
+    {
+        foreach (var method in impl.Methods)
+            EmitMethod(impl.TargetType, method);
+    }
+
+    private void EmitVTable(ImplDeclaration impl)
+    {
+        var slotOrder = _interfaces[impl.InterfaceName].Methods;
+        var ptrType = LLVMTypeRef.CreatePointer(LLVMTypeRef.Int8, 0);
+        var slots = slotOrder
+            .Select(sig =>
+            {
+                var callableKey = new CallableKey(impl.TargetType, sig.Name, sig.Params.Count);
+                return _methods[callableKey].Fn;
+            })
+            .ToArray();
+        var init = LLVMValueRef.CreateConstArray(ptrType, slots);
+        var arrayType = LLVMTypeRef.CreateArray(ptrType, (uint)slots.Length);
+        var global = _module.AddGlobal(arrayType, $"{impl.TargetType}.{impl.InterfaceName}.vtable");
+        global.Initializer = init;
+        global.IsGlobalConstant = true;
+        var vtableKey = new VTableKey(impl.TargetType, impl.InterfaceName);
+        _vtables[vtableKey] = global;
+    }
+    
+    private LLVMTypeRef GetDynType(string interfaceName)
+    {
+        if (_dynTypes.TryGetValue(interfaceName, out var t)) 
+            return t;
+        var ptrType = LLVMTypeRef.CreatePointer(LLVMTypeRef.Int8, 0);
+        var dyn = _module.Context.CreateNamedStruct($"dyn.{interfaceName}");
+        dyn.StructSetBody([ptrType, ptrType], false);   // { data ptr, vtable ptr }
+        _dynTypes[interfaceName] = dyn;
+        return dyn;
+    }
+
+    private LLVMValueRef EmitDynCall(LLVMValueRef fatPtrAddr, LLVMTypeRef dynType, MethodCall node)
+    {
+        var ptrType = LLVMTypeRef.CreatePointer(LLVMTypeRef.Int8, 0);
+        var interfaceName = dynType.StructName["dyn.".Length..];          // "%dyn.IShape".StructName -> "IShape"
+        var iface = _interfaces[interfaceName];
+
+        // (a) which slot is this method? -- same interface order the vtable was built with
+        var slot = iface.Methods
+            .Select((m, i) => (m, i))
+            .First(x => x.m.Name == node.MethodName && x.m.Params.Count == node.Args.Count);
+
+        // (b) pull the two halves out of the fat pointer { data, vtable }
+        var dataPtr = _builder.BuildLoad2(ptrType, _builder.BuildStructGEP2(dynType, fatPtrAddr, 0, "dyn.data.ptr"), "dyn.data");
+        var vtable  = _builder.BuildLoad2(ptrType, _builder.BuildStructGEP2(dynType, fatPtrAddr, 1, "dyn.vtable.ptr"), "dyn.vtable");
+
+        // (c) load the function pointer from vtable[slot]
+        var llvmValueRefs = new[]
+        {
+            LLVMValueRef.CreateConstInt(LLVMTypeRef.Int32, (ulong)slot.i)
+        };
+        var slotAddr = _builder.BuildInBoundsGEP2(ptrType, vtable, llvmValueRefs, "vtable.slot");
+        var fnPtr    = _builder.BuildLoad2(ptrType, slotAddr, "fn");
+
+        // (d) rebuild the callee signature from the interface method: retType (ptr this, ...params)
+        var paramTypes = new LLVMTypeRef[slot.m.Params.Count + 1];
+        paramTypes[0] = ptrType;                                          // this
+        for (var i = 0; i < slot.m.Params.Count; i++)
+            paramTypes[i + 1] = ResolveType(slot.m.Params[i].Type);
+        var fnSig = LLVMTypeRef.CreateFunction(ResolveType(slot.m.ReturnType), paramTypes);
+
+        // (e) indirect call: fnPtr(dataPtr as this, ...args)
+        var args = new[] { dataPtr }
+            .Concat(node.Args.Select(a => a.Accept(this)))
+            .ToArray();
+        return _builder.BuildCall2(fnSig, fnPtr, args, "dyn.call");
     }
 
     // --- structs ---
@@ -165,6 +256,8 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     public LLVMValueRef VisitMethodCall(MethodCall node)
     {
         var (receiverPtr, structType) = ResolveStructPointer(node.Receiver);
+        if (structType.StructName.StartsWith("dyn."))
+            return EmitDynCall(receiverPtr, structType, node);
         var structName = structType.StructName;
         var args = new LLVMValueRef[node.Args.Count + 1];
         args[0] = receiverPtr;                                                        // `this`
@@ -322,7 +415,21 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
 
     public LLVMValueRef VisitCast(CastExpr node)
     {
+        if (node.Target is DynType dyn)
+            return EmitUpcast(node.Value, dyn.InterfaceName);
         return _builder.EmitCast(node.Value.Accept(this), ResolveType(node.Target));
+    }
+
+    private LLVMValueRef EmitUpcast(Expr value, string interfaceName)
+    {
+        var (dataPtr, structType) = ResolveStructPointer(value);
+        var vtableKey = new VTableKey(structType.StructName, interfaceName);
+        var vtable = _vtables[vtableKey];
+        var dynType = GetDynType(interfaceName);
+        var fatPtr = dynType.Undef;
+        fatPtr = _builder.BuildInsertValue(fatPtr, dataPtr, 0, "dyn.data");
+        fatPtr = _builder.BuildInsertValue(fatPtr, vtable, 1, "dyn.vtable");
+        return fatPtr;
     }
 
     public LLVMValueRef VisitCall(CallExpr node)
@@ -487,6 +594,7 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     {
         NamedType n when _structs.TryGetValue(n.Name, out var info) => info.Type,   // struct name -> %Struct
         NamedType n => AstHelpers.MapPrimitiveType(n.Name),
+        DynType d => GetDynType(d.InterfaceName),
         _ => throw new NotSupportedException($"type {type} not supported yet")
     };
 }
