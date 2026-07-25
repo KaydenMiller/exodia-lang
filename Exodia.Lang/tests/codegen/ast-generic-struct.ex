@@ -1,4 +1,4 @@
-// generic structs -- inferred + explicit type args, multi-param, and nested (structural inference).
+// generic structs -- explicit type args on `new`, multi-param, and nested (Box<T> inside Wrapper<T>).
 struct Box<T> {
     v: T;
     ctor(a: T) { this.v = a; }
@@ -12,13 +12,13 @@ struct Pair<A, B> {
 }
 struct Wrapper<T> {
     inner: Box<T>;
-    ctor(b: Box<T>) { this.inner = b; }   // param `Box<T>` -> T inferred structurally from the arg
+    ctor(b: Box<T>) { this.inner = b; }   // field/param typed with the struct's own T
 }
 fn main(): int32 {
-    const bi = new Box(7);            print(bi.get());     // 7  -> inferred Box$i32
-    const bd = new Box<double>(2.5);                        //    -> explicit Box$double
-    const p = new Pair(9, 1.5);       print(p.first());    // 9  -> Pair$i32$double
-    const w = new Wrapper(bi);                              //    -> Wrapper$i32 (structural inference)
+    const bi = new Box<int32>(7);            print(bi.get());     // 7  -> Box$i32
+    const bd = new Box<double>(2.5);                                //    -> Box$double
+    const p = new Pair<int32, double>(9, 1.5); print(p.first());  // 9  -> Pair$i32$double
+    const w = new Wrapper<int32>(bi);                              //    -> Wrapper$i32
     const inner = w.inner;            print(inner.get());  // 7
     return 0;
 }

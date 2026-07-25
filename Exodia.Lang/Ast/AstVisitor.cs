@@ -50,6 +50,10 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     // reverse map: mangled instance name ("Box$i32") -> what template + type-args produced it.
     // lets structural inference recover T from a concrete argument of type %Box$i32.
     private readonly Dictionary<string, (StructDeclaration Template, Dictionary<string, LLVMTypeRef> Env)> _structInstances = [];
+    // generic methods: parked keyed by (owner, name, arity). StructEnv is the owner's substitution
+    // at park time ({} for a plain struct, {T->i32} for Box$i32) -- composed with the method's own
+    // {U->...} at call time. Owner may be a mangled struct name or an impl target type.
+    private readonly Dictionary<CallableKey, (MethodDeclaration Method, Dictionary<string, LLVMTypeRef> StructEnv)> _methodTemplates = [];
     
     
     public AstVisitor(LLVMModuleRef module)
@@ -165,26 +169,6 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         }
     }
 
-    // Infer a generic struct's type arguments from `new` argument types, matching against the
-    // chosen constructor's params (or the fields, for positional init).
-    private Dictionary<string, LLVMTypeRef> InferStructTypeArgs(StructDeclaration template, string ctorName, LLVMTypeRef[] argTypes)
-    {
-        var ctor = template.Constructors.FirstOrDefault(c => (c.Name ?? "") == ctorName && c.Params.Count == argTypes.Length);
-        IReadOnlyList<TypeRef> paramTypes =
-            ctor is not null                                       ? ctor.Params.Select(p => p.Type).ToList()
-            : ctorName == "" && argTypes.Length == template.Fields.Count ? template.Fields.Select(f => f.Type).ToList()
-            : throw new NotSupportedException($"cannot infer type arguments for '{template.Name}': no constructor '{ctorName}' with {argTypes.Length} args");
-
-        var typeParamNames = template.TypeParams.Select(tp => tp.Name).ToHashSet();
-        var env = new Dictionary<string, LLVMTypeRef>();
-        for (var i = 0; i < paramTypes.Count; i++)
-            Unify(paramTypes[i], argTypes[i], typeParamNames, env);
-        foreach (var tp in template.TypeParams)
-            if (!env.ContainsKey(tp.Name))
-                throw new NotSupportedException($"could not infer type argument '{tp.Name}' for struct '{template.Name}'");
-        return env;
-    }
-
     // Match a declared parameter type against a concrete argument's LLVM type, binding any of
     // `ours` (this template's type params) that appear. Handles bare `T` and nested `Box<T>`.
     private void Unify(TypeRef paramType, LLVMTypeRef argType, HashSet<string> ours, Dictionary<string, LLVMTypeRef> env)
@@ -208,13 +192,14 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     {
         var structType = _structs[impl.TargetType].Type;
         foreach (var method in impl.Methods)
-            DeclareMethod(impl.TargetType, structType, method);
+            DeclareOrParkMethod(impl.TargetType, structType, method);
     }
 
     private void EmitImpl(ImplDeclaration impl)
     {
         foreach (var method in impl.Methods)
-            EmitMethod(impl.TargetType, method);
+            if (method.TypeParams.Count == 0)                                          // generic methods emit at call time
+                EmitMethod(impl.TargetType, method);
     }
 
     private void EmitVTable(ImplDeclaration impl)
@@ -303,7 +288,19 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         _structs[node.Name] = new StructInfo(structType, fields);
 
         foreach (var ctor in node.Constructors) DeclareConstructor(node.Name, structType, ctor);
-        foreach (var method in node.Methods) DeclareMethod(node.Name, structType, method);
+        foreach (var method in node.Methods) DeclareOrParkMethod(node.Name, structType, method);
+    }
+
+    // A generic method (`fn echo<U>(...)`) has no LLVM signature until U is known, so park it as a
+    // template capturing the owner's current substitution env (the struct's {T->...}); a plain
+    // method is declared immediately.
+    private void DeclareOrParkMethod(string owner, LLVMTypeRef structType, MethodDeclaration method)
+    {
+        if (method.TypeParams.Count > 0)
+            _methodTemplates[new CallableKey(owner, method.Name, method.Params.Count)] =
+                (method, new Dictionary<string, LLVMTypeRef>(_activeSubstitutionEnv));
+        else
+            DeclareMethod(owner, structType, method);
     }
 
     private void DeclareConstructor(string structName, LLVMTypeRef structType, ConstructorDeclaration ctor)
@@ -332,7 +329,9 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     private void EmitStructBodies(StructDeclaration node)
     {
         foreach (var ctor in node.Constructors) EmitConstructor(node.Name, ctor);
-        foreach (var method in node.Methods) EmitMethod(node.Name, method);
+        foreach (var method in node.Methods)
+            if (method.TypeParams.Count == 0)                                          // generic methods emit at call time
+                EmitMethod(node.Name, method);
     }
 
     private void EmitConstructor(string structName, ConstructorDeclaration ctor)
@@ -377,13 +376,12 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
 
         if (!_structs.TryGetValue(node.StructName, out var info))
         {
-            // generic struct: infer type args from the constructor arguments, then instantiate.
             if (!_structTemplates.TryGetValue(node.StructName, out var template))
                 throw new NotSupportedException($"unknown struct '{node.StructName}'");
-            var env = node.TypeArgs.Count > 0                                          // explicit new Box<int32>(...)
-                ? BuildStructEnv(template, node.TypeArgs)
-                : InferStructTypeArgs(template, ctorName, args.Select(a => a.TypeOf).ToArray());  // inferred new Box(...)
-            info = InstantiateStruct(template, env);
+            if (node.TypeArgs.Count == 0)
+                throw new NotSupportedException(
+                    $"generic struct '{node.StructName}' requires explicit type arguments, e.g. new {node.StructName}<...>(...)");
+            info = InstantiateStruct(template, BuildStructEnv(template, node.TypeArgs));
         }
         var structName = info.Type.StructName;                                        // "Vec" or mangled "Box$i32"
 
@@ -405,6 +403,53 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         return _builder.BuildLoad2(field.Type, ptr, node.FieldName);
     }
 
+    // Infer a generic method's own type args ({U->...}) from its argument types. Same bare +
+    // structural unification as functions/structs; the method's params, not the receiver.
+    private Dictionary<string, LLVMTypeRef> InferMethodTypeArgs(MethodDeclaration template, LLVMTypeRef[] argTypes)
+    {
+        var names = template.TypeParams.Select(tp => tp.Name).ToHashSet();
+        var env = new Dictionary<string, LLVMTypeRef>();
+        for (var i = 0; i < template.Params.Count; i++)
+            Unify(template.Params[i].Type, argTypes[i], names, env);
+        foreach (var tp in template.TypeParams)
+            if (!env.ContainsKey(tp.Name))
+                throw new NotSupportedException($"could not infer type argument '{tp.Name}' for method '{template.Name}'");
+        return env;
+    }
+
+    // Emit a concrete instance of a generic method under the COMPOSED env (struct's {T->...} plus
+    // the method's {U->...}). Reuses DeclareMethod/EmitMethod -- the concrete method has a mangled
+    // name and no type params, so it is just an ordinary method to that machinery.
+    private Callable InstantiateMethod(string owner, LLVMTypeRef structType, MethodDeclaration template,
+        Dictionary<string, LLVMTypeRef> structEnv, Dictionary<string, LLVMTypeRef> methodEnv)
+    {
+        var mangledName = $"{template.Name}${string.Join("$", template.TypeParams.Select(tp => methodEnv[tp.Name].ToString()))}";
+        var key = new CallableKey(owner, mangledName, template.Params.Count);
+        if (_methods.TryGetValue(key, out var cached))
+            return cached;                                   // instantiate each (method, type-args) once
+
+        var concrete = template with { Name = mangledName, TypeParams = [] };
+        var composed = new Dictionary<string, LLVMTypeRef>(structEnv);
+        foreach (var kv in methodEnv) composed[kv.Key] = kv.Value;    // method params win over struct params on clash
+
+        // instantiation happens mid-emission of the caller -> save/restore builder + symbols + env.
+        var savedBlock = _builder.InsertBlock;
+        var savedSymbols = new Dictionary<string, Symbol>(_symbols);
+        var savedEnv = _activeSubstitutionEnv;
+
+        _activeSubstitutionEnv = composed;
+        DeclareMethod(owner, structType, concrete);          // adds _methods[key]
+        var instance = _methods[key];                        // cache-before-body: recursive self-calls resolve here
+        EmitMethod(owner, concrete);
+
+        _activeSubstitutionEnv = savedEnv;
+        _symbols.Clear();
+        foreach (var kv in savedSymbols) _symbols[kv.Key] = kv.Value;
+        if (savedBlock.Handle != IntPtr.Zero) _builder.PositionAtEnd(savedBlock);
+
+        return instance;
+    }
+
     public LLVMValueRef VisitMethodCall(MethodCall node)
     {
         var (receiverPtr, structType) = ResolveStructPointer(node.Receiver);
@@ -415,9 +460,16 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         args[0] = receiverPtr;                                                        // `this`
         for (var i = 0; i < node.Args.Count; i++)
             args[i + 1] = node.Args[i].Accept(this);
-        if (!_methods.TryGetValue(new CallableKey(structName, node.MethodName, node.Args.Count), out var m))
-            throw new NotSupportedException($"struct '{structName}' has no method '{node.MethodName}' taking {node.Args.Count} args");
-        return _builder.BuildCall2(m.Signature, m.Fn, args, $"{structName}.{node.MethodName}.call");
+        var key = new CallableKey(structName, node.MethodName, node.Args.Count);
+        if (_methods.TryGetValue(key, out var m))                                     // concrete or already-instantiated
+            return _builder.BuildCall2(m.Signature, m.Fn, args, $"{structName}.{node.MethodName}.call");
+        if (_methodTemplates.TryGetValue(key, out var template))                      // generic method: infer -> instantiate
+        {
+            var methodEnv = InferMethodTypeArgs(template.Method, args.Skip(1).Select(a => a.TypeOf).ToArray());
+            var instance = InstantiateMethod(structName, structType, template.Method, template.StructEnv, methodEnv);
+            return _builder.BuildCall2(instance.Signature, instance.Fn, args, $"{structName}.{node.MethodName}.call");
+        }
+        throw new NotSupportedException($"struct '{structName}' has no method '{node.MethodName}' taking {node.Args.Count} args");
     }
 
     public LLVMValueRef VisitThis(ThisExpr node)

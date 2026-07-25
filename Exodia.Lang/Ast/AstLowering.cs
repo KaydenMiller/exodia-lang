@@ -142,13 +142,7 @@ public class AstLowering
                 constructors.Add(new ConstructorDeclaration(
                     c.identifier()?.GetText(), LowerParams(c.formal_parameter_list()), LowerBlockStatement(c.block_statement()), Span(c)));
             else if (kind.method_declaration() is {} m)
-                methods.Add(new MethodDeclaration(
-                    m.identifier().GetText(),
-                    LowerTypeParams(context.type_parameters(), context.where_clause()),
-                    LowerParams(m.formal_parameter_list()),
-                    LowerType(m.type()),
-                    LowerBody(m.function_body()),
-                    Span(m)));
+                methods.Add(LowerMethodDeclaration(m));   // reads m.type_parameters(), not the struct's
         }
         return new StructDeclaration(context.identifier().GetText(),
             LowerTypeParams(context.type_parameters(), context.where_clause()),
