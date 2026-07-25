@@ -17,26 +17,47 @@ public class AstLowering
     public ProgramNode LowerProgram(ExodiaParser.ProgramContext context)
     {
         var functions = new List<FnDeclaration>();
-        foreach (var statement in context.statement()) 
+        var structs = new List<StructDeclaration>();
+        foreach (var statement in context.statement())
+        {
             if (statement.function_declaration() is {} fn)
                 functions.Add(LowerFunction(fn));
-        return new ProgramNode(functions, Span(context));
+            else if (statement.struct_declaration() is {} s)
+                structs.Add(LowerStruct(s));
+        }
+        return new ProgramNode(functions, structs, Span(context));
     }
 
-    private FnDeclaration LowerFunction(ExodiaParser.Function_declarationContext context)
-    {
-        var formals = context.formal_parameter_list()
-            ?.formal_parameter() ?? [];
-        var parameters = formals
-            .Select(f => 
-                new Param(f.identifier().GetText(), LowerType(f.type()), Span(f)))
+    private static List<Param> LowerParams(ExodiaParser.Formal_parameter_listContext? list)
+        => (list?.formal_parameter() ?? [])
+            .Select(f => new Param(f.identifier().GetText(), LowerType(f.type()), Span(f)))
             .ToList();
-        return new FnDeclaration(
-            context.identifier().GetText(),
-            parameters,
-            LowerType(context.type()),
-            LowerBody(context.function_body()),
-            Span(context));
+
+    private FnDeclaration LowerFunction(ExodiaParser.Function_declarationContext context)
+        => new(context.identifier().GetText(),
+               LowerParams(context.formal_parameter_list()),
+               LowerType(context.type()),
+               LowerBody(context.function_body()),
+               Span(context));
+
+    private StructDeclaration LowerStruct(ExodiaParser.Struct_declarationContext context)
+    {
+        var fields = new List<FieldDeclaration>();
+        var constructors = new List<ConstructorDeclaration>();
+        var methods = new List<MethodDeclaration>();
+        foreach (var member in context.member())
+        {
+            var kind = member.member_kind();
+            if (kind.field_declaration() is {} f)
+                fields.Add(new FieldDeclaration(f.identifier().GetText(), LowerType(f.type()), Span(f)));
+            else if (kind.constructor_declaration() is {} c)
+                constructors.Add(new ConstructorDeclaration(
+                    c.identifier()?.GetText(), LowerParams(c.formal_parameter_list()), LowerBlockStatement(c.block_statement()), Span(c)));
+            else if (kind.method_declaration() is {} m)
+                methods.Add(new MethodDeclaration(
+                    m.identifier().GetText(), LowerParams(m.formal_parameter_list()), LowerType(m.type()), LowerBody(m.function_body()), Span(m)));
+        }
+        return new StructDeclaration(context.identifier().GetText(), fields, constructors, methods, Span(context));
     }
 
     private VariableDeclaration LowerVariableDeclaration(ExodiaParser.Variable_statementContext context)
@@ -54,9 +75,11 @@ public class AstLowering
 
     private Block LowerBody(ExodiaParser.Function_bodyContext context)
     {
-        var block = context.block_statement()
-                    ?? throw new NotSupportedException("expression-bodied functions not lowered yet");
-        return LowerBlockStatement(block);
+        if (context.block_statement() is { } block)
+            return LowerBlockStatement(block);
+        // `=> expr` desugars to `{ return expr; }` -- codegen only ever sees blocks.
+        var span = Span(context);
+        return new Block([new ReturnStatement(_expressions.Visit(context.expression()), span)], span);
     }
 
     private Block LowerBlockStatement(ExodiaParser.Block_statementContext context)
@@ -233,21 +256,47 @@ public class ExpressionLowering : ExodiaBaseVisitor<Expr>
         return value;
     }
 
+    public override Expr VisitNew_expression(ExodiaParser.New_expressionContext context)
+    {
+        var args = ExodiaHelpers.CollectArgs(context.arguments().argument_list())
+            .Select(a => Visit(a.assignment_expression()))
+            .ToList();
+        return new NewExpr(
+            context.qualified_name().GetText(),
+            context.identifier()?.GetText(),          // named-ctor part (new T.Named(...))
+            args,
+            AstLowering.Span(context));
+    }
+
+    public override Expr VisitThis_expression(ExodiaParser.This_expressionContext context)
+        => new ThisExpr(AstLowering.Span(context));
+
     public override Expr VisitPostfix_expression(ExodiaParser.Postfix_expressionContext context)
     {
         var ops = context.postfix_op();
         if (ops.Length == 0)
             return Visit(context.primary_expression());
 
+        // f(args) -- free function call
         if (ops.Length == 1 && ops[0].arguments() is { } argsCtx)
-        {
-            var callee = context.primary_expression().GetText();
-            var args = ExodiaHelpers.CollectArgs(argsCtx.argument_list())
-                .Select(arg => Visit(arg.assignment_expression()))
-                .ToList();
-            return new CallExpr(callee, args, AstLowering.Span(context));
-        }
+            return new CallExpr(
+                context.primary_expression().GetText(),
+                LowerArgs(argsCtx),
+                AstLowering.Span(context));
+
+        // p.field -- field read
+        if (ops.Length == 1 && ops[0].identifier() is { } fieldId)
+            return new FieldAccess(Visit(context.primary_expression()), fieldId.GetText(), AstLowering.Span(context));
+
+        // p.method(args) -- method call
+        if (ops.Length == 2 && ops[0].identifier() is { } methodId && ops[1].arguments() is { } methodArgs)
+            return new MethodCall(Visit(context.primary_expression()), methodId.GetText(), LowerArgs(methodArgs), AstLowering.Span(context));
 
         throw new NotSupportedException($"postfix form not lowered yet: {context.GetText()}");
     }
+
+    private List<Expr> LowerArgs(ExodiaParser.ArgumentsContext arguments)
+        => ExodiaHelpers.CollectArgs(arguments.argument_list())
+            .Select(arg => Visit(arg.assignment_expression()))
+            .ToList();
 }

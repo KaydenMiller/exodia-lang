@@ -20,9 +20,38 @@ public record NamedType(string Name, TextSpan TextSpan) : TypeRef(TextSpan);
 public record Param(string Name, TypeRef Type, TextSpan TextSpan);
 
 
-public record ProgramNode(IReadOnlyList<FnDeclaration> Functions, TextSpan TextSpan) : AstNode(TextSpan)
+public record ProgramNode(IReadOnlyList<FnDeclaration> Functions, IReadOnlyList<StructDeclaration> Structs, TextSpan TextSpan) : AstNode(TextSpan)
 {
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitProgram(this);
+}
+
+// --- struct declarations (data; processed by AstVisitor's 3-phase, not visited) ---
+public record FieldDeclaration(string Name, TypeRef Type, TextSpan TextSpan);
+public record ConstructorDeclaration(string? Name, IReadOnlyList<Param> Params, Block Body, TextSpan TextSpan);
+public record MethodDeclaration(string Name, IReadOnlyList<Param> Params, TypeRef ReturnType, Block Body, TextSpan TextSpan);
+public record StructDeclaration(
+    string Name,
+    IReadOnlyList<FieldDeclaration> Fields,
+    IReadOnlyList<ConstructorDeclaration> Constructors,
+    IReadOnlyList<MethodDeclaration> Methods,
+    TextSpan TextSpan);
+
+// --- struct expressions (visited) ---
+public record NewExpr(string StructName, string? ConstructorName, IReadOnlyList<Expr> Args, TextSpan TextSpan) : Expr(TextSpan)
+{
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitNew(this);
+}
+public record FieldAccess(Expr Target, string FieldName, TextSpan TextSpan) : Expr(TextSpan)
+{
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitFieldAccess(this);
+}
+public record MethodCall(Expr Receiver, string MethodName, IReadOnlyList<Expr> Args, TextSpan TextSpan) : Expr(TextSpan)
+{
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitMethodCall(this);
+}
+public record ThisExpr(TextSpan TextSpan) : Expr(TextSpan)
+{
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitThis(this);
 }
 
 public record FnDeclaration(string Name, IReadOnlyList<Param> Params, TypeRef ReturnType, Block Body, TextSpan TextSpan) : AstNode(TextSpan)

@@ -22,6 +22,10 @@ public interface IAstVisitor<T>
     T VisitIntLiteral(IntLiteral node);
     T VisitFloatLiteral(FloatLiteral node);
     T VisitBoolLiteral(BoolLiteral node);
+    T VisitNew(NewExpr node);
+    T VisitFieldAccess(FieldAccess node);
+    T VisitMethodCall(MethodCall node);
+    T VisitThis(ThisExpr node);
 }
 
 public class AstVisitor : IAstVisitor<LLVMValueRef>
@@ -30,19 +34,169 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     public readonly LLVMBuilderRef _builder;
     private readonly Dictionary<string, Symbol> _symbols = [];
     private readonly Dictionary<CallableKey, Callable> _functions = [];
+    private readonly Dictionary<string, StructInfo> _structs = [];
+    private readonly Dictionary<CallableKey, Callable> _constructors = [];
+    private readonly Dictionary<CallableKey, Callable> _methods = [];
 
     public AstVisitor(LLVMModuleRef module)
     {
         _module = module;
         _builder = _module.Context.CreateBuilder();
     }
-    
+
     public LLVMValueRef VisitProgram(ProgramNode node)
     {
-        foreach (var fn in node.Functions) DeclareFunction(fn);       // pass 1: signatures
-        foreach (var fn in node.Functions) fn.Accept(this);     // pass 2: bodies
+        foreach (var s in node.Structs) RegisterStruct(s);            // phase 1: struct types + ctor/method decls
+        foreach (var fn in node.Functions) DeclareFunction(fn);       // phase 2: function signatures
+        foreach (var fn in node.Functions) fn.Accept(this);           // phase 3a: function bodies
+        foreach (var s in node.Structs) EmitStructBodies(s);          // phase 3b: ctor/method bodies
         return default;
     }
+
+    // --- structs ---
+    private void RegisterStruct(StructDeclaration node)
+    {
+        var fieldTypes = new List<LLVMTypeRef>();
+        var fields = new Dictionary<string, StructInfoField>();
+        uint index = 0;
+        foreach (var f in node.Fields)
+        {
+            var t = ResolveType(f.Type);
+            fields[f.Name] = new StructInfoField(index, t);
+            fieldTypes.Add(t);
+            index++;
+        }
+        var structType = _module.Context.CreateNamedStruct(node.Name);
+        structType.StructSetBody(fieldTypes.ToArray(), false);
+        _structs[node.Name] = new StructInfo(structType, fields);
+
+        foreach (var ctor in node.Constructors) DeclareConstructor(node.Name, structType, ctor);
+        foreach (var method in node.Methods) DeclareMethod(node.Name, structType, method);
+    }
+
+    private void DeclareConstructor(string structName, LLVMTypeRef structType, ConstructorDeclaration ctor)
+    {
+        var name = ctor.Name ?? "";
+        var key = new CallableKey(structName, name, ctor.Params.Count);
+        if (_constructors.ContainsKey(key))
+            throw new NotSupportedException($"'{structName}' already has constructor '{name}' with {ctor.Params.Count} params");
+        var paramTypes = ctor.Params.Select(p => ResolveType(p.Type)).ToArray();
+        var sig = LLVMTypeRef.CreateFunction(structType, paramTypes);                 // returns the struct by value
+        var mangled = $"{structName}.{(name == "" ? "ctor" : name)}.{ctor.Params.Count}";
+        _constructors[key] = new Callable(_module.AddFunction(mangled, sig), sig);
+    }
+
+    private void DeclareMethod(string structName, LLVMTypeRef structType, MethodDeclaration method)
+    {
+        var paramTypes = new LLVMTypeRef[method.Params.Count + 1];
+        paramTypes[0] = LLVMTypeRef.CreatePointer(structType, 0);                     // `this` by pointer
+        for (var i = 0; i < method.Params.Count; i++)
+            paramTypes[i + 1] = ResolveType(method.Params[i].Type);
+        var sig = LLVMTypeRef.CreateFunction(ResolveType(method.ReturnType), paramTypes);
+        _methods[new CallableKey(structName, method.Name, method.Params.Count)] =
+            new Callable(_module.AddFunction($"{structName}.{method.Name}.{method.Params.Count}", sig), sig);
+    }
+
+    private void EmitStructBodies(StructDeclaration node)
+    {
+        foreach (var ctor in node.Constructors) EmitConstructor(node.Name, ctor);
+        foreach (var method in node.Methods) EmitMethod(node.Name, method);
+    }
+
+    private void EmitConstructor(string structName, ConstructorDeclaration ctor)
+    {
+        var structType = _structs[structName].Type;
+        var fn = _constructors[new CallableKey(structName, ctor.Name ?? "", ctor.Params.Count)].Fn;
+        _builder.PositionAtEnd(fn.AppendBasicBlock("entry"));
+        _symbols.Clear();
+        var thisSlot = _builder.BuildAlloca(structType, "this");                      // ctor allocates `this`
+        _symbols["this"] = new Symbol(thisSlot, structType);
+        BindParams(fn, ctor.Params, 0);
+        ctor.Body.Accept(this);
+        _builder.BuildRet(_builder.BuildLoad2(structType, thisSlot, "thisval"));      // implicit `return this`
+    }
+
+    private void EmitMethod(string structName, MethodDeclaration method)
+    {
+        var structType = _structs[structName].Type;
+        var fn = _methods[new CallableKey(structName, method.Name, method.Params.Count)].Fn;
+        _builder.PositionAtEnd(fn.AppendBasicBlock("entry"));
+        _symbols.Clear();
+        _symbols["this"] = new Symbol(fn.GetParam(0), structType);                    // `this` is the incoming pointer
+        BindParams(fn, method.Params, 1);
+        method.Body.Accept(this);
+    }
+
+    private void BindParams(LLVMValueRef fn, IReadOnlyList<Param> parameters, uint offset)
+    {
+        for (var i = 0; i < parameters.Count; i++)
+        {
+            var t = ResolveType(parameters[i].Type);
+            var slot = _builder.BuildAlloca(t, parameters[i].Name);
+            _builder.BuildStore(fn.GetParam((uint)i + offset), slot);
+            _symbols[parameters[i].Name] = new Symbol(slot, t);
+        }
+    }
+
+    public LLVMValueRef VisitNew(NewExpr node)
+    {
+        if (!_structs.TryGetValue(node.StructName, out var info))
+            throw new NotSupportedException($"unknown struct '{node.StructName}'");
+        var args = node.Args.Select(a => a.Accept(this)).ToArray();
+        var ctorName = node.ConstructorName ?? "";
+        if (_constructors.TryGetValue(new CallableKey(node.StructName, ctorName, args.Length), out var ctor))
+            return _builder.BuildCall2(ctor.Signature, ctor.Fn, args, $"{node.StructName}.new");
+        if (ctorName == "" && args.Length == info.Fields.Count)                       // positional fallback
+        {
+            var value = info.Type.Undef;
+            for (var i = 0; i < args.Length; i++)
+                value = _builder.BuildInsertValue(value, args[i], (uint)i, $"{node.StructName}.f{i}");
+            return value;
+        }
+        throw new NotSupportedException($"'{node.StructName}' has no constructor '{ctorName}' taking {args.Length} args");
+    }
+
+    public LLVMValueRef VisitFieldAccess(FieldAccess node)
+    {
+        var (ptr, field) = ResolveField(node);
+        return _builder.BuildLoad2(field.Type, ptr, node.FieldName);
+    }
+
+    public LLVMValueRef VisitMethodCall(MethodCall node)
+    {
+        var (receiverPtr, structType) = ResolveStructPointer(node.Receiver);
+        var structName = structType.StructName;
+        var args = new LLVMValueRef[node.Args.Count + 1];
+        args[0] = receiverPtr;                                                        // `this`
+        for (var i = 0; i < node.Args.Count; i++)
+            args[i + 1] = node.Args[i].Accept(this);
+        if (!_methods.TryGetValue(new CallableKey(structName, node.MethodName, node.Args.Count), out var m))
+            throw new NotSupportedException($"struct '{structName}' has no method '{node.MethodName}' taking {node.Args.Count} args");
+        return _builder.BuildCall2(m.Signature, m.Fn, args, $"{structName}.{node.MethodName}.call");
+    }
+
+    public LLVMValueRef VisitThis(ThisExpr node)
+    {
+        var self = _symbols["this"];
+        return _builder.BuildLoad2(self.Type, self.Slot, "this");
+    }
+
+    // Field access needs the base struct's ADDRESS (to GEP), not a loaded value.
+    private (LLVMValueRef Ptr, StructInfoField Field) ResolveField(FieldAccess node)
+    {
+        var (basePtr, structType) = ResolveStructPointer(node.Target);
+        var info = _structs[structType.StructName];
+        if (!info.Fields.TryGetValue(node.FieldName, out var field))
+            throw new NotSupportedException($"struct '{structType.StructName}' has no field '{node.FieldName}'");
+        return (_builder.BuildStructGEP2(structType, basePtr, field.Index, $"{node.FieldName}.ptr"), field);
+    }
+
+    private (LLVMValueRef Ptr, LLVMTypeRef StructType) ResolveStructPointer(Expr target) => target switch
+    {
+        NameRef n when _symbols.TryGetValue(n.Name, out var sym) => (sym.Slot, sym.Type),
+        ThisExpr => (_symbols["this"].Slot, _symbols["this"].Type),
+        _ => throw new NotSupportedException($"cannot resolve struct pointer for {target}")
+    };
 
     private void DeclareFunction(FnDeclaration node)
     {
@@ -71,6 +225,10 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
             _symbols[node.Params[i].Name] = new Symbol(slot, paramTypes[i]);
         }
         node.Body.Accept(this);
+        // if control falls off the end without a terminator (e.g. a dead if-merge block where
+        // both arms returned), cap it -- keeps IR valid instead of an empty, terminatorless block.
+        if (_builder.InsertBlock.Terminator.Handle == IntPtr.Zero)
+            _builder.BuildUnreachable();
         return fn;
     }
 
@@ -144,9 +302,17 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     public LLVMValueRef VisitAssignmentExpr(AssignExpr node)
     {
         var value = node.Value.Accept(this);
-        _builder.BuildStore(value, _symbols.ResolveLValue(node.Target));
+        _builder.BuildStore(value, ResolveLValue(node.Target));
         return value;
     }
+
+    // The address to store INTO: a local's slot, or a field's GEP (p.x = ..., this.x = ...).
+    private LLVMValueRef ResolveLValue(Expr target) => target switch
+    {
+        NameRef n when _symbols.TryGetValue(n.Name, out var sym) => sym.Slot,
+        FieldAccess f => ResolveField(f).Ptr,
+        _ => throw new NotSupportedException($"unsupported assignment target: {target}")
+    };
 
     public LLVMValueRef VisitExpressionStatement(ExpressionStatement node)
     {
@@ -319,6 +485,7 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
 
     private LLVMTypeRef ResolveType(TypeRef type) => type switch
     {
+        NamedType n when _structs.TryGetValue(n.Name, out var info) => info.Type,   // struct name -> %Struct
         NamedType n => AstHelpers.MapPrimitiveType(n.Name),
         _ => throw new NotSupportedException($"type {type} not supported yet")
     };
