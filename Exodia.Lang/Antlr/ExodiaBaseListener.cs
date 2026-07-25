@@ -937,6 +937,18 @@ public partial class ExodiaBaseListener : IExodiaListener {
 	/// <param name="context">The parse tree.</param>
 	public virtual void ExitPrimary_expression([NotNull] ExodiaParser.Primary_expressionContext context) { }
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.enum_construction"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void EnterEnum_construction([NotNull] ExodiaParser.Enum_constructionContext context) { }
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.enum_construction"/>.
+	/// <para>The default implementation does nothing.</para>
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	public virtual void ExitEnum_construction([NotNull] ExodiaParser.Enum_constructionContext context) { }
+	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.parenthesized_expression"/>.
 	/// <para>The default implementation does nothing.</para>
 	/// </summary>

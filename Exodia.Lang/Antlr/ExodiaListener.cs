@@ -782,6 +782,16 @@ public interface IExodiaListener : IParseTreeListener {
 	/// <param name="context">The parse tree.</param>
 	void ExitPrimary_expression([NotNull] ExodiaParser.Primary_expressionContext context);
 	/// <summary>
+	/// Enter a parse tree produced by <see cref="ExodiaParser.enum_construction"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void EnterEnum_construction([NotNull] ExodiaParser.Enum_constructionContext context);
+	/// <summary>
+	/// Exit a parse tree produced by <see cref="ExodiaParser.enum_construction"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	void ExitEnum_construction([NotNull] ExodiaParser.Enum_constructionContext context);
+	/// <summary>
 	/// Enter a parse tree produced by <see cref="ExodiaParser.parenthesized_expression"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>

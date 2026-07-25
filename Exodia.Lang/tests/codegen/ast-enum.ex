@@ -29,9 +29,22 @@ fn main(): int32 {
     });
 
     const c = Color::Green;
-    return match c {                     // 2 -> tag compare only
+    print(match c {                      // 2 -> tag compare only
         Red   => 1,
         Green => 2,
         Blue  => 3
+    });
+
+    const g = IntOption::Some(15);
+    print(match g {                      // 5 -> guard true; guard-false would fall through
+        Some(n) when n >= 10 => 5,
+        Some(n)              => 1,
+        None                 => 0
+    });
+
+    const w = IntOption::Some(9);
+    return match w {                     // 9 -> `Some(x) v` binds payload x and whole value v
+        Some(x) v => x,
+        None      => 0
     };
 }

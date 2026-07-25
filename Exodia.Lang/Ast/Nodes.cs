@@ -49,7 +49,7 @@ public record EnumDeclaration(string Name, IReadOnlyList<TypeParam> TypeParams, 
 
 // --- patterns (sort of their own; consumed by match codegen, not visited via Accept) ---
 public abstract record Pattern(TextSpan TextSpan);
-public record VariantPattern(string VariantName, IReadOnlyList<Pattern> Payload, TextSpan TextSpan) : Pattern(TextSpan);  // Some(x)
+public record VariantPattern(string VariantName, IReadOnlyList<Pattern> Payload, string? Binding, TextSpan TextSpan) : Pattern(TextSpan);  // Some(x), or `Red r` (Binding="r")
 public record NamePattern(string Name, TextSpan TextSpan) : Pattern(TextSpan);        // bare name: payload-less variant (None) OR a binding -- resolved at match time
 public record WildcardPattern(TextSpan TextSpan) : Pattern(TextSpan);                 // _
 
@@ -74,6 +74,11 @@ public record StructDeclaration(
 public record NewExpr(string StructName, IReadOnlyList<TypeRef> TypeArgs, string? ConstructorName, IReadOnlyList<Expr> Args, TextSpan TextSpan) : Expr(TextSpan)
 {
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitNew(this);
+}
+// explicit generic-enum construction: `Option<float>::Some(1.4f)`
+public record EnumConstructExpr(string EnumName, IReadOnlyList<TypeRef> TypeArgs, string VariantName, IReadOnlyList<Expr> Args, TextSpan TextSpan) : Expr(TextSpan)
+{
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitEnumConstruct(this);
 }
 public record FieldAccess(Expr Target, string FieldName, TextSpan TextSpan) : Expr(TextSpan)
 {

@@ -27,6 +27,7 @@ public interface IAstVisitor<T>
     T VisitMethodCall(MethodCall node);
     T VisitThis(ThisExpr node);
     T VisitMatch(MatchExpr node);
+    T VisitEnumConstruct(EnumConstructExpr node);
 }
 
 public class AstVisitor : IAstVisitor<LLVMValueRef>
@@ -56,7 +57,9 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     // {U->...} at call time. Owner may be a mangled struct name or an impl target type.
     private readonly Dictionary<CallableKey, (MethodDeclaration Method, Dictionary<string, LLVMTypeRef> StructEnv)> _methodTemplates = [];
     private readonly Dictionary<string, EnumInfo> _enums = [];                        // enum name (or mangled) -> layout + variants
-    private readonly Dictionary<string, EnumDeclaration> _enumTemplates = [];         // generic enums (concrete-only for now)
+    private readonly Dictionary<string, EnumDeclaration> _enumTemplates = [];         // generic enums: parked until instantiated
+    private readonly Dictionary<string, EnumDeclaration> _enumInstances = [];         // mangled ("Option$float") -> its template
+    private LLVMTypeRef? _expectedType;                                               // target type driving construction (form C)
     
     
     public AstVisitor(LLVMModuleRef module)
@@ -328,12 +331,55 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         _enums[node.Name] = new EnumInfo(type, variants);
     }
 
-    // Split "Color::Red" -> (enum, variant) if it names a known enum variant; else null.
-    private (EnumInfo Info, EnumVariantInfo Variant)? TryResolveVariant(string qualified)
+    // Turn a parked generic enum into a concrete one under `env` (T -> float). Enums have no bodies,
+    // so RegisterEnum (declaration only) fully instantiates -- no drain phase needed.
+    private EnumInfo InstantiateEnum(EnumDeclaration template, Dictionary<string, LLVMTypeRef> env)
+    {
+        var mangled = $"{template.Name}${string.Join("$", template.TypeParams.Select(tp => MangleType(env[tp.Name])))}";
+        if (_enums.TryGetValue(mangled, out var cached)) return cached;
+
+        var savedEnv = _activeSubstitutionEnv;
+        _activeSubstitutionEnv = env;
+        RegisterEnum(template with { Name = mangled, TypeParams = [] });
+        _activeSubstitutionEnv = savedEnv;
+
+        _enumInstances[mangled] = template;
+        return _enums[mangled];
+    }
+
+    private Dictionary<string, LLVMTypeRef> BuildEnumEnv(EnumDeclaration template, IReadOnlyList<TypeRef> typeArgs)
+    {
+        if (template.TypeParams.Count != typeArgs.Count)
+            throw new NotSupportedException($"'{template.Name}' expects {template.TypeParams.Count} type argument(s), got {typeArgs.Count}");
+        var env = new Dictionary<string, LLVMTypeRef>();
+        for (var i = 0; i < template.TypeParams.Count; i++)
+            env[template.TypeParams[i].Name] = ResolveType(typeArgs[i]);
+        return env;
+    }
+
+    // Construct an enum variant named "Enum::Variant". Handles concrete enums directly, and generic
+    // enums via the expected/target type (form C): `const x: Option<float> = Option::Some(1.4f)`.
+    // Returns null if it isn't an enum variant at all (so a normal call/name can proceed).
+    private LLVMValueRef? TryConstructEnum(string qualified, LLVMValueRef[] args)
     {
         var parts = qualified.Split("::");
-        if (parts.Length != 2 || !_enums.TryGetValue(parts[0], out var info)) return null;
-        return info.Variants.TryGetValue(parts[1], out var variant) ? (info, variant) : null;
+        if (parts.Length != 2) return null;
+        var (enumName, variantName) = (parts[0], parts[1]);
+
+        if (_enums.TryGetValue(enumName, out var concrete) && concrete.Variants.TryGetValue(variantName, out var cv))
+            return EmitEnumConstruct(concrete, cv, args);
+
+        if (_enumTemplates.TryGetValue(enumName, out var template) && template.Variants.Any(v => v.Name == variantName))
+        {
+            if (_expectedType is { } et && _enumInstances.TryGetValue(et.StructName, out var tmpl) && tmpl.Name == enumName)
+            {
+                var info = _enums[et.StructName];
+                return EmitEnumConstruct(info, info.Variants[variantName], args);
+            }
+            throw new NotSupportedException(
+                $"cannot infer type arguments for '{qualified}'; annotate the target type (e.g. `const x: {enumName}<...> = ...`) or write `{enumName}<...>::{variantName}(...)`");
+        }
+        return null;
     }
 
     // Build an enum value: store the tag into slot 0 and each arg into its payload slot.
@@ -534,6 +580,18 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         return _builder.BuildLoad2(self.Type, self.Slot, "this");
     }
 
+    // explicit generic-enum construction: Option<float>::Some(1.4f)
+    public LLVMValueRef VisitEnumConstruct(EnumConstructExpr node)
+    {
+        var args = node.Args.Select(a => a.Accept(this)).ToArray();
+        if (!_enumTemplates.TryGetValue(node.EnumName, out var template))
+            throw new NotSupportedException($"'{node.EnumName}' is not a generic enum");
+        var info = InstantiateEnum(template, BuildEnumEnv(template, node.TypeArgs));
+        if (!info.Variants.TryGetValue(node.VariantName, out var variant))
+            throw new NotSupportedException($"enum '{node.EnumName}' has no variant '{node.VariantName}'");
+        return EmitEnumConstruct(info, variant, args);
+    }
+
     // match: load the tag, then an if-else chain -- each arm tests its pattern (tag compare) and,
     // if it matches, binds any payload and evaluates its body; results merge through a phi.
     public LLVMValueRef VisitMatch(MatchExpr node)
@@ -550,14 +608,18 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         for (var i = 0; i < node.Arms.Count; i++)
         {
             var arm = node.Arms[i];
-            if (arm.Guard is not null)
-                throw new NotSupportedException("when-guards not supported yet");
-            var body = fn.AppendBasicBlock($"match.arm{i}");
+            var armBlock = fn.AppendBasicBlock($"match.arm{i}");   // tag matched -> bind + (guard) + body
             var fail = fn.AppendBasicBlock(i < node.Arms.Count - 1 ? $"match.next{i}" : "match.nomatch");
-            _builder.BuildCondBr(TestPattern(arm.Pattern, tag, info), body, fail);
+            _builder.BuildCondBr(TestPattern(arm.Pattern, tag, info), armBlock, fail);
 
-            _builder.PositionAtEnd(body);
-            BindPattern(arm.Pattern, scrutinee, info);
+            _builder.PositionAtEnd(armBlock);
+            BindPattern(arm.Pattern, scrutinee, info);            // bind BEFORE the guard -- it reads the bindings
+            if (arm.Guard is not null)
+            {
+                var bodyBlock = fn.AppendBasicBlock($"match.body{i}");
+                _builder.BuildCondBr(arm.Guard.Accept(this), bodyBlock, fail);   // guard false -> try next arm
+                _builder.PositionAtEnd(bodyBlock);
+            }
             phiVals.Add(arm.BodyExpr!.Accept(this));
             phiBlocks.Add(_builder.InsertBlock);           // body may have appended blocks
             _builder.BuildBr(merge);
@@ -597,6 +659,8 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
                 break;
             case VariantPattern v:
                 var variant = info.Variants[v.VariantName];
+                if (v.Binding is not null)                             // `Red r` / `Some(x) s` -> bind the whole value
+                    BindLocal(v.Binding, scrutinee);
                 for (var i = 0; i < v.Payload.Count; i++)
                     switch (v.Payload[i])
                     {
@@ -690,10 +754,15 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
 
     public LLVMValueRef VisitVariableDeclaration(VariableDeclaration node)
     {
+        // resolve the declared type FIRST -- it instantiates any generic enum/struct and becomes the
+        // target type that drives target-typed construction (form C) inside the initializer.
+        var declared = node.Type is not null ? ResolveType(node.Type) : (LLVMTypeRef?)null;
+        var savedExpected = _expectedType;
+        _expectedType = declared;
         var value = node.Initializer.Accept(this);
-        var type = node.Type is not null
-            ? ResolveType(node.Type)
-            : value.TypeOf;
+        _expectedType = savedExpected;
+
+        var type = declared ?? value.TypeOf;
         var slot = _builder.BuildAlloca(type, node.Name);
         _builder.BuildStore(value, slot);
         _symbols[node.Name] = new Symbol(slot, type);
@@ -704,8 +773,8 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     {
         if (_symbols.TryGetValue(node.Name, out var sym))
             return _builder.BuildLoad2(sym.Type, sym.Slot, node.Name);
-        if (node.Name.Contains("::") && TryResolveVariant(node.Name) is { } v)     // payload-less variant: Color::Red
-            return EmitEnumConstruct(v.Info, v.Variant, []);
+        if (node.Name.Contains("::") && TryConstructEnum(node.Name, []) is { } ev)     // payload-less variant: Color::Red / Option::None
+            return ev;
         throw new NotSupportedException($"Unknown name '{node.Name}'");
     }
 
@@ -804,8 +873,8 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
             .ToArray();
         if (node.Callee == "print")
             return EmitPrint(args);
-        if (node.Callee.Contains("::") && TryResolveVariant(node.Callee) is { } v)   // enum construction: Option::Some(5)
-            return EmitEnumConstruct(v.Info, v.Variant, args);
+        if (node.Callee.Contains("::") && TryConstructEnum(node.Callee, args) is { } ev)   // enum construction: Option::Some(5)
+            return ev;
         var key = new CallableKey("", node.Callee, args.Length);
         if (_functions.TryGetValue(key, out var target))        // already a real fn? then call it
             return _builder.BuildCall2(target.Signature, target.Fn, args, "call");
@@ -979,9 +1048,11 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     // to its instantiated LLVM struct type.
     private LLVMTypeRef ResolveGenericType(GenericType g)
     {
-        if (!_structTemplates.TryGetValue(g.Name, out var template))
-            throw new NotSupportedException($"'{g.Name}' is not a generic struct");
-        return InstantiateStruct(template, BuildStructEnv(template, g.TypeArgs)).Type;
+        if (_structTemplates.TryGetValue(g.Name, out var st))
+            return InstantiateStruct(st, BuildStructEnv(st, g.TypeArgs)).Type;
+        if (_enumTemplates.TryGetValue(g.Name, out var et))
+            return InstantiateEnum(et, BuildEnumEnv(et, g.TypeArgs)).Type;
+        throw new NotSupportedException($"'{g.Name}' is not a generic struct or enum");
     }
 
     // Map explicit type arguments (from `Box<int32>` or `new Box<int32>(...)`) to a substitution

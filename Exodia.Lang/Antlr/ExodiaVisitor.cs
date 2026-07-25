@@ -483,6 +483,12 @@ public interface IExodiaVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitPrimary_expression([NotNull] ExodiaParser.Primary_expressionContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="ExodiaParser.enum_construction"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitEnum_construction([NotNull] ExodiaParser.Enum_constructionContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="ExodiaParser.parenthesized_expression"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>

@@ -445,7 +445,7 @@ pattern
     ;
     
 primary_pattern
-    : qualified_name pattern_payload?
+    : qualified_name pattern_payload? identifier?   // trailing identifier = bind the matched value (e.g. `Red r`)
     | literal (DOTDOT literal)?
     | '_'
     ;
@@ -455,7 +455,8 @@ pattern_payload
     ;
     
 primary_expression
-    : literal
+    : enum_construction
+    | literal
     | qualified_name
     | this_expression
     | super
@@ -463,6 +464,12 @@ primary_expression
     | new_expression
     | match_expression
     | array_literal
+    ;
+
+// explicit generic-enum construction: `Option<float>::Some(1.4f)` / `Option<float>::None`.
+// the required type_arguments disambiguate this from a plain `Option::Some(..)` call.
+enum_construction
+    : qualified_name type_arguments COLONCOLON identifier arguments?
     ;
     
 parenthesized_expression

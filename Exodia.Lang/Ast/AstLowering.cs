@@ -385,6 +385,14 @@ public class ExpressionLowering : ExodiaBaseVisitor<Expr>
     public override Expr VisitThis_expression(ExodiaParser.This_expressionContext context)
         => new ThisExpr(AstLowering.Span(context));
 
+    public override Expr VisitEnum_construction(ExodiaParser.Enum_constructionContext context)
+        => new EnumConstructExpr(
+            context.qualified_name().GetText(),
+            context.type_arguments().type().Select(AstLowering.LowerType).ToList(),
+            context.identifier().GetText(),
+            context.arguments() is { } a ? LowerArgs(a) : [],
+            AstLowering.Span(context));
+
     public override Expr VisitMatch_expression(ExodiaParser.Match_expressionContext context)
     {
         var scrutinee = Visit(context.expression());
@@ -418,8 +426,10 @@ public class ExpressionLowering : ExodiaBaseVisitor<Expr>
         if (context.qualified_name() is { } qn)
         {
             var name = qn.identifier().Last().GetText();          // Option::Some -> Some
-            return context.pattern_payload() is { } payload
-                ? new VariantPattern(name, payload.pattern().Select(LowerPattern).ToList(), span)
+            var binding = context.identifier()?.GetText();        // trailing name: `Red r` / `Some(x) s`
+            var payload = context.pattern_payload();
+            return payload is not null || binding is not null
+                ? new VariantPattern(name, (payload?.pattern() ?? []).Select(LowerPattern).ToList(), binding, span)
                 : new NamePattern(name, span);                    // None (variant) or x (binding) -- resolved at match time
         }
         throw new NotSupportedException($"literal patterns not supported yet: {context.GetText()}");
