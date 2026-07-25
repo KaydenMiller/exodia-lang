@@ -2,6 +2,7 @@
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Exe</OutputType>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
 
@@ -13,21 +14,16 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="FluentAssertions" Version="6.10.0"/>
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.3.2"/>
-        <PackageReference Include="xunit" Version="2.4.2"/>
-        <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5">
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-            <PrivateAssets>all</PrivateAssets>
-        </PackageReference>
-        <PackageReference Include="coverlet.collector" Version="3.1.2">
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-            <PrivateAssets>all</PrivateAssets>
-        </PackageReference>
+        <PackageReference Include="TUnit" Version="1.61.15"/>
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\Exodia.Lang\Exodia.Lang.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- Exodia source fixtures copied next to the test binary so Fixtures.Load can read them. -->
+        <None Include="Fixtures\**\*.ex" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
 </Project>
