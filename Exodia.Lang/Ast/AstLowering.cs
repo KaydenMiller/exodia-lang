@@ -143,6 +143,7 @@ public class AstLowering
         var isExtern = context.EXTERN() is not null;
         if (isExtern && context.type_parameters() is not null)
             throw new NotSupportedException("extern functions cannot be generic (no single C symbol)");
+        var isVariadic = context.formal_parameter_list()?.ELLIPSIS() is not null;   // trailing `, ...`
         return new(context.identifier().GetText(),
             LowerTypeParams(context.type_parameters(), context.where_clause()),
             LowerParams(context.formal_parameter_list()),
@@ -150,6 +151,7 @@ public class AstLowering
             isExtern ? null : LowerBody(context.function_body()),
             isExtern,
             null,
+            isVariadic,
             Span(context)
             );
     }
@@ -259,6 +261,8 @@ public class ExpressionLowering : ExodiaBaseVisitor<Expr>
 {
     public override Expr VisitQualified_name(ExodiaParser.Qualified_nameContext context)
     {
+        if (context.GetText() == "unit")                          // the Unit value keyword (§20)
+            return new UnitLiteral(AstLowering.Span(context));
         return new NameRef(context.GetText(), AstLowering.Span(context));
     }
 

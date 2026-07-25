@@ -97,10 +97,11 @@ public record FnDeclaration(
     string Name,
     IReadOnlyList<TypeParam> TypeParams,
     IReadOnlyList<Param> Params,
-    TypeRef ReturnType, 
+    TypeRef ReturnType,
     Block? Body,
     bool IsExtern,
     string? LinkName,
+    bool IsVariadic,
     TextSpan TextSpan) : AstNode(TextSpan)
 {
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitFnDeclaration(this);
@@ -114,6 +115,12 @@ public record VariableDeclaration(string Name, bool IsMutable, TypeRef? Type, Ex
 public record NameRef(string Name, TextSpan TextSpan) : Expr(TextSpan)
 {
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitNameRef(this);
+}
+
+// the sole value of the Unit type (keyword `unit`). Erases to nothing at the ABI (§20).
+public record UnitLiteral(TextSpan TextSpan) : Expr(TextSpan)
+{
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitUnitLiteral(this);
 }
 
 public record Block(IReadOnlyList<Statement> Statements, TextSpan TextSpan) : Statement(TextSpan)

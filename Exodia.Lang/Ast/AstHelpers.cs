@@ -14,7 +14,7 @@ public static class AstHelpers
         "char"              => ctx.Int32Type,
         "float"             => ctx.FloatType,
         "double"            => ctx.DoubleType,
-        "void"              => ctx.VoidType,
+        "unit" or "void"    => ctx.VoidType,   // Unit is zero-sized -> LLVM void in return position (§20)
         "cstr"              => LLVMTypeRef.CreatePointer(ctx.Int8Type, 0),
         _ => throw new NotSupportedException($"Type '{name}' not supported in codegen")
     };

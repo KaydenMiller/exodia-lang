@@ -9,6 +9,7 @@ public interface IAstVisitor<T>
     T VisitFnDeclaration(FnDeclaration node);
     T VisitVariableDeclaration(VariableDeclaration node);
     T VisitNameRef(NameRef node);
+    T VisitUnitLiteral(UnitLiteral node);
     T VisitBlock(Block node);
     T VisitIf(IfStatement node);
     T VisitReturn(ReturnStatement node);
@@ -37,6 +38,7 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     public readonly LLVMBuilderRef _builder;
     private readonly Dictionary<string, Symbol> _symbols = [];
     private readonly Dictionary<CallableKey, Callable> _functions = [];
+    private readonly Dictionary<string, Callable> _variadics = [];   // variadic fns, keyed by name (call arity varies)
     private readonly Dictionary<string, StructInfo> _structs = [];
     private readonly Dictionary<CallableKey, Callable> _constructors = [];
     private readonly Dictionary<CallableKey, Callable> _methods = [];
@@ -728,10 +730,11 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         var paramTypes = node.Params
             .Select(p => ResolveType(p.Type))
             .ToArray();
-        var fnType = LLVMTypeRef.CreateFunction(ResolveType(node.ReturnType), paramTypes);
+        var fnType = LLVMTypeRef.CreateFunction(ResolveType(node.ReturnType), paramTypes, node.IsVariadic);
         var fn = _module.AddFunction(node.LinkName ?? node.Name, fnType);
-        var key = new CallableKey("", node.Name, node.Params.Count);
-        _functions[key] = new Callable(fn, fnType);
+        var callable = new Callable(fn, fnType);
+        _functions[new CallableKey("", node.Name, node.Params.Count)] = callable;
+        if (node.IsVariadic) _variadics[node.Name] = callable;   // callable at any arity >= fixed params
     }
 
     public LLVMValueRef VisitFnDeclaration(FnDeclaration node)
@@ -750,10 +753,15 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
             _symbols[node.Params[i].Name] = new Symbol(slot, paramTypes[i]);
         }
         node.Body!.Accept(this);
-        // if control falls off the end without a terminator (e.g. a dead if-merge block where
-        // both arms returned), cap it -- keeps IR valid instead of an empty, terminatorless block.
+        // if control falls off the end without a terminator: a unit/void fn returns; anything else
+        // is a dead merge block (e.g. both if-arms returned) -> unreachable to keep the IR valid.
         if (_builder.InsertBlock.Terminator.Handle == IntPtr.Zero)
-            _builder.BuildUnreachable();
+        {
+            if (ResolveType(node.ReturnType).Kind == LLVMTypeKind.LLVMVoidTypeKind)
+                _builder.BuildRetVoid();
+            else
+                _builder.BuildUnreachable();
+        }
         return fn;
     }
 
@@ -825,11 +833,15 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
 
     public LLVMValueRef VisitReturn(ReturnStatement node)
     {
-        var value = node.Value?.Accept(this);
-        if (value is null)
+        if (node.Value is null or UnitLiteral)                    // `return;` or `return unit;` -> void
             return _builder.BuildRetVoid();
-        return _builder.BuildRet(value.Value);
+        return _builder.BuildRet(node.Value.Accept(this));
     }
+
+    // The Unit value only lives in return position for now (handled in VisitReturn before it gets
+    // here). Value-position Unit -- Result<unit,E>, `const x: unit` -- needs the zero-size rep (§20 inc 2).
+    public LLVMValueRef VisitUnitLiteral(UnitLiteral node) =>
+        throw new NotSupportedException("`unit` as a value is only supported in return position yet (Result<unit,E> etc. come with the zero-size representation)");
 
     public LLVMValueRef VisitAssignmentExpr(AssignExpr node)
     {
@@ -870,6 +882,11 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         fatPtr = _builder.BuildInsertValue(fatPtr, vtable, 1, "dyn.vtable");
         return fatPtr;
     }
+    
+    // A void-returning call must be UNNAMED -- LLVM rejects a named void instruction.
+    private LLVMValueRef EmitCall(Callable c, LLVMValueRef[] args) =>
+        _builder.BuildCall2(c.Signature, c.Fn, args,
+            c.Signature.ReturnType.Kind == LLVMTypeKind.LLVMVoidTypeKind ? "" : "call");
 
     public LLVMValueRef VisitCall(CallExpr node)
     {
@@ -882,12 +899,14 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
             return ev;
         var key = new CallableKey("", node.Callee, args.Length);
         if (_functions.TryGetValue(key, out var target))        // already a real fn? then call it
-            return _builder.BuildCall2(target.Signature, target.Fn, args, "call");
+            return EmitCall(target, args);
+        if (_variadics.TryGetValue(node.Callee, out var variadic))   // variadic fn: matches any call arity >= fixed
+            return EmitCall(variadic, args);
         if (_fnTemplates.TryGetValue(key, out var template)) // a recipe/template for a fn? build it, then call.
         {
             var substitutionEnv = InferTypeArgs(template, args.Select(arg => arg.TypeOf).ToArray());
             var instance = Instantiate(template, substitutionEnv);
-            return _builder.BuildCall2(instance.Signature, instance.Fn, args, "call");
+            return EmitCall(instance, args);
         }
         throw new NotSupportedException($"no function '{node.Callee}' taking {args.Length} args");
     }

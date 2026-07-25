@@ -21,9 +21,14 @@
 //     | llc -relocation-model=pic -filetype=obj -o /tmp/p.o - \
 //     && clang /tmp/p.o -o /tmp/p && /tmp/p
 
-extern fn printf(format: cstr): int32;
+// `...` marks a C-style variadic: ONE declaration handles any trailing args.
+// It lowers to `declare i32 @printf(ptr, ...)`; each call passes however many args
+// it likes, and LLVM emits the correct variadic call (right down to the x86-64 `al`
+// register for float args).
+extern fn printf(format: cstr, ...): int32;
 
 fn main(): int32 {
     printf("linked to libc printf\n");
+    printf("with args: %d and %f\n", 42, 3.14);
     return 0;
 }

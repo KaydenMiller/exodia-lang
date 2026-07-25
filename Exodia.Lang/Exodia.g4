@@ -76,6 +76,7 @@ GE: '>=' ;
 FATARROW: '=>' ;
 ARROW: '->' ;
 PIPE: '|' ;
+ELLIPSIS: '...' ;
 DOTDOT: '..' ;
 QUESTION: '?' ;
 DOUBLE_BANG: '!!' ;
@@ -306,7 +307,7 @@ formal_parameter
     ;
 
 formal_parameter_list
-    : formal_parameter (',' formal_parameter)* 
+    : formal_parameter (',' formal_parameter)* (',' ELLIPSIS)?   // trailing `, ...` = C-style variadic (extern FFI)
     ;
     
 // EXPRESSIONS
