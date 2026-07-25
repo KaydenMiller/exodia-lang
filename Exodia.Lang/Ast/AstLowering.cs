@@ -38,21 +38,36 @@ public class AstLowering
     }
 
     private MethodDeclaration LowerMethodDeclaration(ExodiaParser.Method_declarationContext m)
-        => new(m.identifier().GetText(), LowerParams(m.formal_parameter_list()), LowerType(m.type()), LowerBody(m.function_body()), Span(m));
+        => new(m.identifier().GetText(),
+            LowerTypeParams(m.type_parameters(), m.where_clause()),
+            LowerParams(m.formal_parameter_list()),
+            LowerType(m.type()),
+            LowerBody(m.function_body()),
+            Span(m));
 
     private InterfaceDeclaration LowerInterface(ExodiaParser.Interface_declarationContext context)
     {
         var methods = context.interface_member()
             .Select(member => member.method_signature())
-            .Select(s => new MethodSignature(s.identifier().GetText(), LowerParams(s.formal_parameter_list()), LowerType(s.type()), Span(s)))
+            .Select(s => new MethodSignature(
+                s.identifier().GetText(),
+                LowerTypeParams(context.type_parameters(), context.where_clause()),
+                LowerParams(s.formal_parameter_list()),
+                LowerType(s.type()),
+                Span(s)))
             .ToList();
-        return new InterfaceDeclaration(context.identifier().GetText(), methods, Span(context));
+        return new InterfaceDeclaration(
+            context.identifier().GetText(),
+            LowerTypeParams(context.type_parameters(), context.where_clause()),
+            methods, 
+            Span(context));
     }
 
     private ImplDeclaration LowerImpl(ExodiaParser.Impl_declarationContext context)
         // increment A: no impl_outputs, so type(0)=interface, type(1)=target
         => new(context.type(0).qualified_name().GetText(),
                context.type(1).qualified_name().GetText(),
+               LowerTypeParams(context.type_parameters(), context.where_clause()),
                context.method_declaration().Select(LowerMethodDeclaration).ToList(),
                Span(context));
 
@@ -61,8 +76,46 @@ public class AstLowering
             .Select(f => new Param(f.identifier().GetText(), LowerType(f.type()), Span(f)))
             .ToList();
 
+    private IReadOnlyList<TypeParam> LowerTypeParams(
+        ExodiaParser.Type_parametersContext? typeParams,
+        ExodiaParser.Where_clauseContext[] whereClauses)
+    {
+        if (typeParams is null)
+            return [];
+        
+        // name -> accumulating bound list; `order` preserves declaration order
+        var bounds = new Dictionary<string, List<string>>();
+        var order = new List<ExodiaParser.Type_parameterContext>();
+        foreach (var typeParam in typeParams.type_parameter())
+        {
+            var list = new List<string>();
+            if (typeParam.type() is { } inline)     // inline: `<T: IShape>`
+                list.Add(inline.qualified_name().GetText());
+            bounds[typeParam.identifier().GetText()] = list;
+            order.Add(typeParam);
+        }
+        
+        // fold `where T: A, B` into the matching param's bounds
+        foreach (var clause in whereClauses)
+        {
+            if (!bounds.TryGetValue(clause.identifier().GetText(), out var list))
+                continue;
+            foreach (var type in clause.type())
+                list.Add(type.qualified_name().GetText());
+        }
+
+        return order
+            .Select(typeParam => new TypeParam(
+                typeParam.identifier().GetText(),
+                bounds[typeParam.identifier().GetText()],
+                Span(typeParam)
+            ))
+            .ToList();
+    }
+
     private FnDeclaration LowerFunction(ExodiaParser.Function_declarationContext context)
         => new(context.identifier().GetText(),
+                LowerTypeParams(context.type_parameters(), context.where_clause()),
                LowerParams(context.formal_parameter_list()),
                LowerType(context.type()),
                LowerBody(context.function_body()),
@@ -83,9 +136,19 @@ public class AstLowering
                     c.identifier()?.GetText(), LowerParams(c.formal_parameter_list()), LowerBlockStatement(c.block_statement()), Span(c)));
             else if (kind.method_declaration() is {} m)
                 methods.Add(new MethodDeclaration(
-                    m.identifier().GetText(), LowerParams(m.formal_parameter_list()), LowerType(m.type()), LowerBody(m.function_body()), Span(m)));
+                    m.identifier().GetText(),
+                    LowerTypeParams(context.type_parameters(), context.where_clause()),
+                    LowerParams(m.formal_parameter_list()),
+                    LowerType(m.type()),
+                    LowerBody(m.function_body()),
+                    Span(m)));
         }
-        return new StructDeclaration(context.identifier().GetText(), fields, constructors, methods, Span(context));
+        return new StructDeclaration(context.identifier().GetText(),
+            LowerTypeParams(context.type_parameters(), context.where_clause()),
+            fields,
+            constructors,
+            methods,
+            Span(context));
     }
 
     private VariableDeclaration LowerVariableDeclaration(ExodiaParser.Variable_statementContext context)

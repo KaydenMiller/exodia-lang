@@ -40,6 +40,9 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     private readonly Dictionary<string, InterfaceDeclaration> _interfaces = [];   // captured for dyn (increment B); no IR
     private readonly Dictionary<VTableKey, LLVMValueRef> _vtables = [];
     private readonly Dictionary<string, LLVMTypeRef> _dynTypes = [];
+    private readonly Dictionary<CallableKey, FnDeclaration> _fnTemplates = [];
+    private readonly Dictionary<string, Callable> _instances = [];
+    private Dictionary<string, LLVMTypeRef> _activeSubstitutionEnv = [];
     
     
     public AstVisitor(LLVMModuleRef module)
@@ -55,11 +58,60 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         foreach (var impl in node.Impls) DeclareImpl(impl);           // phase 1c: impl method signatures
         foreach (var impl in node.Impls) EmitVTable(impl);
         
-        foreach (var fn in node.Functions) DeclareFunction(fn);       // phase 2: function signatures
-        foreach (var fn in node.Functions) fn.Accept(this);           // phase 3a: function bodies
+        // We cannot emit a generic fn as LLVM cannot represent it
+        foreach (var fn in node.Functions)
+            if (fn.TypeParams.Count > 0)
+            {
+                var key = new CallableKey("", fn.Name, fn.Params.Count);
+                _fnTemplates[key] = fn;
+            }
+        var concreteFns = node.Functions
+            .Where(fn => fn.TypeParams.Count == 0)
+            .ToList();
+        
+        foreach (var fn in concreteFns) DeclareFunction(fn);       // phase 2: function signatures
+        foreach (var fn in concreteFns) fn.Accept(this);           // phase 3a: function bodies
         foreach (var s in node.Structs) EmitStructBodies(s);          // phase 3b: struct ctor/method bodies
         foreach (var impl in node.Impls) EmitImpl(impl);              // phase 3c: impl method bodies
         return default;
+    }
+
+    public static string Mangle(FnDeclaration template, Dictionary<string, LLVMTypeRef> env) =>
+        $"{template.Name}${template.Params.Count}${string.Join("$", template.TypeParams.Select(tp => env[tp.Name].ToString()))}";
+
+    // Expansion of the fn template into an actual fn
+    private Callable Instantiate(FnDeclaration template, Dictionary<string, LLVMTypeRef> substitutionEnv)
+    {
+        var mangled = Mangle(template, substitutionEnv); // "id$1$i32" -- unique name for THIS instantiation 
+        if (_instances.TryGetValue(mangled, out var cached))
+            return cached; // already built -> then reuse
+
+        // This is now the concrete version of the fn
+        var concrete = template with { Name = mangled, TypeParams = [] };
+
+        // IMPORTANT : When we do this we are in the middle of a call somewhere so we need to save our
+        // current LLVM builder state so we can restore it later.
+        var savedBlock = _builder.InsertBlock;
+        var savedSymbols = new Dictionary<string, Symbol>(_symbols);
+        var savedEnv = _activeSubstitutionEnv;
+        
+        _activeSubstitutionEnv = substitutionEnv;
+        DeclareFunction(concrete);
+        var callableKey = new CallableKey("", mangled, concrete.Params.Count);
+        var instance = _functions[callableKey];
+        _instances[mangled] = instance;
+        concrete.Accept(this);
+
+        _activeSubstitutionEnv = savedEnv;
+        _symbols.Clear();
+        foreach (var kv in savedSymbols)
+        {
+            _symbols[kv.Key] = kv.Value;
+        }
+        if (savedBlock.Handle != IntPtr.Zero)
+            _builder.PositionAtEnd(savedBlock);
+
+        return instance;
     }
 
     // An `impl I for T { … }` just adds methods to T -- reuse the struct-method machinery.
@@ -291,6 +343,23 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         _ => throw new NotSupportedException($"cannot resolve struct pointer for {target}")
     };
 
+    private Dictionary<string, LLVMTypeRef> InferTypeArgs(FnDeclaration template, LLVMTypeRef[] argTypes)
+    {
+        var typeParamNames = template.TypeParams.Select(tp => tp.Name).ToHashSet();
+        var substitutionEnv = new Dictionary<string, LLVMTypeRef>();
+        for (var i = 0; i < template.Params.Count; i++)
+        {
+            // increment 1 infers only params written as bare type parameter (x: T).
+            // nested forms (x: Box<T>) come with generic structs -- structural unification.
+            if (template.Params[i].Type is NamedType n && typeParamNames.Contains(n.Name))
+                substitutionEnv[n.Name] = argTypes[i];
+        }
+        foreach (var tp in template.TypeParams)
+            if (!substitutionEnv.ContainsKey(tp.Name))
+                throw new NotSupportedException($"could not infer type argument '{tp.Name}' for '{template.Name}'");
+        return substitutionEnv;
+    }
+
     private void DeclareFunction(FnDeclaration node)
     {
         var paramTypes = node.Params
@@ -440,9 +509,15 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         if (node.Callee == "print")
             return EmitPrint(args);
         var key = new CallableKey("", node.Callee, args.Length);
-        if (!_functions.TryGetValue(key, out var target))
-            throw new NotSupportedException($"no function '{node.Callee}' taking {args.Length} args");
-        return _builder.BuildCall2(target.Signature, target.Fn, args, "call");
+        if (_functions.TryGetValue(key, out var target))        // already a real fn? then call it
+            return _builder.BuildCall2(target.Signature, target.Fn, args, "call");
+        if (_fnTemplates.TryGetValue(key, out var template)) // a recipe/template for a fn? build it, then call.
+        {
+            var substitutionEnv = InferTypeArgs(template, args.Select(arg => arg.TypeOf).ToArray());
+            var instance = Instantiate(template, substitutionEnv);
+            return _builder.BuildCall2(instance.Signature, instance.Fn, args, "call");
+        }
+        throw new NotSupportedException($"no function '{node.Callee}' taking {args.Length} args");
     }
 
     public LLVMValueRef VisitBinary(BinaryExpr node)
@@ -592,6 +667,7 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
 
     private LLVMTypeRef ResolveType(TypeRef type) => type switch
     {
+        NamedType n when _activeSubstitutionEnv.TryGetValue(n.Name, out var bound) => bound,  // type param -> concrete
         NamedType n when _structs.TryGetValue(n.Name, out var info) => info.Type,   // struct name -> %Struct
         NamedType n => AstHelpers.MapPrimitiveType(n.Name),
         DynType d => GetDynType(d.InterfaceName),

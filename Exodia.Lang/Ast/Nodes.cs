@@ -18,6 +18,8 @@ public abstract record TypeRef(TextSpan TextSpan);
 public record NamedType(string Name, TextSpan TextSpan) : TypeRef(TextSpan);
 public record DynType(string InterfaceName, TextSpan TextSpan) : TypeRef(TextSpan);
 
+public record TypeParam(string Name, IReadOnlyList<string> Bounds, TextSpan TextSpan);
+
 public record Param(string Name, TypeRef Type, TextSpan TextSpan);
 
 
@@ -32,16 +34,17 @@ public record ProgramNode(
 }
 
 // --- interfaces / impls (data; processed by AstVisitor's phases, not visited) ---
-public record MethodSignature(string Name, IReadOnlyList<Param> Params, TypeRef ReturnType, TextSpan TextSpan);
-public record InterfaceDeclaration(string Name, IReadOnlyList<MethodSignature> Methods, TextSpan TextSpan);
-public record ImplDeclaration(string InterfaceName, string TargetType, IReadOnlyList<MethodDeclaration> Methods, TextSpan TextSpan);
+public record MethodSignature(string Name, IReadOnlyList<TypeParam> TypeParams, IReadOnlyList<Param> Params, TypeRef ReturnType, TextSpan TextSpan);
+public record InterfaceDeclaration(string Name, IReadOnlyList<TypeParam> TypeParams, IReadOnlyList<MethodSignature> Methods, TextSpan TextSpan);
+public record ImplDeclaration(string InterfaceName, string TargetType, IReadOnlyList<TypeParam> TypeParams, IReadOnlyList<MethodDeclaration> Methods, TextSpan TextSpan);
 
 // --- struct declarations (data; processed by AstVisitor's 3-phase, not visited) ---
 public record FieldDeclaration(string Name, TypeRef Type, TextSpan TextSpan);
 public record ConstructorDeclaration(string? Name, IReadOnlyList<Param> Params, Block Body, TextSpan TextSpan);
-public record MethodDeclaration(string Name, IReadOnlyList<Param> Params, TypeRef ReturnType, Block Body, TextSpan TextSpan);
+public record MethodDeclaration(string Name, IReadOnlyList<TypeParam> TypeParams, IReadOnlyList<Param> Params, TypeRef ReturnType, Block Body, TextSpan TextSpan);
 public record StructDeclaration(
     string Name,
+    IReadOnlyList<TypeParam> TypeParams,
     IReadOnlyList<FieldDeclaration> Fields,
     IReadOnlyList<ConstructorDeclaration> Constructors,
     IReadOnlyList<MethodDeclaration> Methods,
@@ -65,7 +68,7 @@ public record ThisExpr(TextSpan TextSpan) : Expr(TextSpan)
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitThis(this);
 }
 
-public record FnDeclaration(string Name, IReadOnlyList<Param> Params, TypeRef ReturnType, Block Body, TextSpan TextSpan) : AstNode(TextSpan)
+public record FnDeclaration(string Name, IReadOnlyList<TypeParam> TypeParams, IReadOnlyList<Param> Params, TypeRef ReturnType, Block Body, TextSpan TextSpan) : AstNode(TextSpan)
 {
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitFnDeclaration(this);
 }
