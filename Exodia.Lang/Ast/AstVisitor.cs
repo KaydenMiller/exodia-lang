@@ -91,8 +91,14 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         return default;
     }
 
+    // A stable, symbol-safe spelling for a type in a mangled name. Primitives -> "i32"/"double";
+    // named structs -> their StructName ("Circle", "Box$i32"), NOT LLVMTypeRef.ToString() which
+    // for a struct returns the whole "%Circle = type { i32 }" definition.
+    private static string MangleType(LLVMTypeRef t) =>
+        t.Kind == LLVMTypeKind.LLVMStructTypeKind ? t.StructName : t.ToString();
+
     public static string Mangle(FnDeclaration template, Dictionary<string, LLVMTypeRef> env) =>
-        $"{template.Name}${template.Params.Count}${string.Join("$", template.TypeParams.Select(tp => env[tp.Name].ToString()))}";
+        $"{template.Name}${template.Params.Count}${string.Join("$", template.TypeParams.Select(tp => MangleType(env[tp.Name])))}";
 
     // Expansion of the fn template into an actual fn
     private Callable Instantiate(FnDeclaration template, Dictionary<string, LLVMTypeRef> substitutionEnv)
@@ -130,7 +136,7 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     }
 
     public static string MangleStruct(StructDeclaration template, Dictionary<string, LLVMTypeRef> env) =>
-        $"{template.Name}${string.Join("$", template.TypeParams.Select(tp => env[tp.Name].ToString()))}";
+        $"{template.Name}${string.Join("$", template.TypeParams.Select(tp => MangleType(env[tp.Name])))}";
 
     // Turn a parked generic struct into a concrete one under `env` (T -> i32).
     // Only DECLARES here (named type + field layout + ctor/method signatures) -- builder-free,
@@ -423,7 +429,7 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     private Callable InstantiateMethod(string owner, LLVMTypeRef structType, MethodDeclaration template,
         Dictionary<string, LLVMTypeRef> structEnv, Dictionary<string, LLVMTypeRef> methodEnv)
     {
-        var mangledName = $"{template.Name}${string.Join("$", template.TypeParams.Select(tp => methodEnv[tp.Name].ToString()))}";
+        var mangledName = $"{template.Name}${string.Join("$", template.TypeParams.Select(tp => MangleType(methodEnv[tp.Name])))}";
         var key = new CallableKey(owner, mangledName, template.Params.Count);
         if (_methods.TryGetValue(key, out var cached))
             return cached;                                   // instantiate each (method, type-args) once

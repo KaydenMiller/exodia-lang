@@ -20,5 +20,7 @@ fn main(): int32 {
     const p = new Pair<int32, double>(9, 1.5); print(p.first());  // 9  -> Pair$i32$double
     const w = new Wrapper<int32>(bi);                              //    -> Wrapper$i32
     const inner = w.inner;            print(inner.get());  // 7
+    const nested = new Box<Box<int32>>(bi);                        //    -> Box$Box$i32 (nested generic)
+    const un = nested.get();          print(un.get());    // 7  -> inner Box$i32
     return 0;
 }
