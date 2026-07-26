@@ -6,7 +6,7 @@
 // Build + run:
 //   dotnet run --project Exodia.Lang -- examples/http-server.ex \
 //     | llc -relocation-model=pic -filetype=obj -o /tmp/server.o - \
-//     && clang /tmp/server.o runtime/net.c -o /tmp/server \
+//     && clang /tmp/server.o runtime/net.c runtime/str.c -o /tmp/server \
 //     && /tmp/server
 //   # then, in another shell:  curl localhost:8080
 

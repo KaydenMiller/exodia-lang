@@ -47,6 +47,7 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     // swapped out during nested function/method emission so a nested `return` only releases its own scopes.
     private List<List<(string Name, LLVMTypeRef Heap)>> _scopes = [];
     private readonly Dictionary<CallableKey, string> _returnClass = [];   // callables whose return type is a class (opaque ptrs lose it)
+    private readonly Dictionary<string, HashSet<int>> _cstrParams = [];   // fn name -> param indices typed `cstr` (String->cstr FFI coercion)
     private readonly Dictionary<CallableKey, Callable> _constructors = [];
     private readonly Dictionary<CallableKey, Callable> _methods = [];
     private readonly Dictionary<string, InterfaceDeclaration> _interfaces = [];   // captured for dyn (increment B); no IR
@@ -77,6 +78,26 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         _module = module;
         _ctx = module.Context;
         _builder = _module.Context.CreateBuilder();
+        RegisterStringType();
+    }
+
+    // String is a builtin, RC-managed reference type -- a class in all but name, so it reuses the
+    // whole retain/release/free path. Header is { i64 rc, i64 len }; UTF-8 bytes live inline right
+    // after (one allocation, done by the runtime shim). `length` is field 1.
+    private void RegisterStringType()
+    {
+        var t = _ctx.CreateNamedStruct("String");
+        t.StructSetBody([_ctx.Int64Type, _ctx.Int64Type], false);   // { rc, len }; bytes inline after
+        _structs["String"] = new StructInfo(t, new Dictionary<string, StructInfoField> { ["length"] = new StructInfoField(1, _ctx.Int64Type) });
+        _classNames.Add("String");
+        _classRefFields["String"] = [];                             // no class-typed fields to recurse on
+    }
+
+    private (LLVMValueRef Fn, LLVMTypeRef Type) StrExtern(string name, LLVMTypeRef ret, params LLVMTypeRef[] ps)
+    {
+        var t = LLVMTypeRef.CreateFunction(ret, ps);
+        var e = _module.GetNamedFunction(name);
+        return e.Handle != IntPtr.Zero ? (e, t) : (_module.AddFunction(name, t), t);
     }
 
     public LLVMValueRef VisitProgram(ProgramNode node)
@@ -560,8 +581,14 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         }
     }
 
-    public LLVMValueRef VisitStringLiteral(StringLiteral node) =>
-        _builder.BuildGlobalStringPtr(node.Value, "str");
+    public LLVMValueRef VisitStringLiteral(StringLiteral node)
+    {
+        var bytes = _builder.BuildGlobalStringPtr(node.Value, "str.bytes");   // i8* to the global UTF-8 bytes
+        var len = LLVMValueRef.CreateConstInt(_ctx.Int64Type, (ulong)System.Text.Encoding.UTF8.GetByteCount(node.Value));
+        var obj = EmitStringAlloc(len);                                       // heap String, rc=1
+        EmitMemcpy(StringDataPtr(obj), bytes, len);                           // copy the literal bytes in
+        return obj;
+    }
 
     // libc malloc, declared on demand (like GetPrintf).
     private (LLVMValueRef Fn, LLVMTypeRef Type) GetMalloc()
@@ -670,6 +697,8 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     // if/else, not ?: -- LLVMTypeRef converts a null ptr to default, so a ?: with null misbehaves.
     private LLVMTypeRef? ClassHeapOf(Expr e)
     {
+        if (e is StringLiteral) return _structs["String"].Type;    // "..." is a String
+        if (e is BinaryExpr { Operation: "+" } b && ClassHeapOf(b.Left) is { StructName: "String" }) return _structs["String"].Type;   // String concat
         if (e is NewExpr n && _classNames.Contains(n.StructName)) return _structs[n.StructName].Type;
         if (e is NameRef r && _symbols.TryGetValue(r.Name, out var s) && s.Pointee is { } h) return h;
         if (e is CallExpr c && _returnClass.TryGetValue(new CallableKey("", c.Callee, c.Args.Count), out var rc)) return _structs[rc].Type;
@@ -686,13 +715,101 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         return null;   // method-call class-values deferred
     }
 
-    // A class temporary (a `new`/call producing +1, passed inline as an argument rather than bound to a
-    // local) must be released after the call -- otherwise its +1 is orphaned and leaks.
+    // A "+1 producer" yields an OWNED value (new / call / method call / string literal / string concat).
+    // Bound to a local -> transfers ownership; passed inline / as an operand -> a temporary to release.
+    private bool IsFreshOwned(Expr e) =>
+        e is NewExpr or CallExpr or MethodCall or StringLiteral
+        || (e is BinaryExpr { Operation: "+" } b && ClassHeapOf(b.Left) is { StructName: "String" });
+
+    private void ReleaseTemp(Expr e, LLVMValueRef v)
+    {
+        if (IsFreshOwned(e) && ClassHeapOf(e) is { } heap) EmitRelease(v, heap);
+    }
+
     private void ReleaseTemporaryArgs(IReadOnlyList<Expr> argExprs, LLVMValueRef[] argVals)
     {
         for (var i = 0; i < argExprs.Count; i++)
-            if (argExprs[i] is NewExpr or CallExpr && ClassHeapOf(argExprs[i]) is { } heap)
-                EmitRelease(argVals[i], heap);
+            ReleaseTemp(argExprs[i], argVals[i]);
+    }
+
+    // String `+` (concat) and `==`/`!=` (byte compare), backed by the runtime shim. Operand temporaries
+    // (literals, other concats) are released after use.
+    private LLVMValueRef EmitStringBinary(BinaryExpr node)
+    {
+        var ptr = LLVMTypeRef.CreatePointer(_ctx.Int8Type, 0);
+        var strType = _structs["String"].Type;
+        var a = node.Left.Accept(this);
+        var b = node.Right.Accept(this);
+        var aLen = _builder.BuildLoad2(_ctx.Int64Type, _builder.BuildStructGEP2(strType, a, 1, "a.len"), "aLen");
+        var bLen = _builder.BuildLoad2(_ctx.Int64Type, _builder.BuildStructGEP2(strType, b, 1, "b.len"), "bLen");
+        LLVMValueRef result;
+        if (node.Operation == "+")
+        {
+            var obj = EmitStringAlloc(_builder.BuildAdd(aLen, bLen, "cat.len"));       // fresh String, rc=1
+            var dest = StringDataPtr(obj);
+            EmitMemcpy(dest, StringDataPtr(a), aLen);
+            EmitMemcpy(_builder.BuildInBoundsGEP2(_ctx.Int8Type, dest, new[] { aLen }, "cat.b"), StringDataPtr(b), bLen);
+            result = obj;
+        }
+        else                                                                          // == / != : lengths equal AND bytes equal
+        {
+            var fn = _builder.InsertBlock.Parent;
+            var entry = _builder.InsertBlock;
+            var cmp = fn.AppendBasicBlock("str.cmp");
+            var done = fn.AppendBasicBlock("str.eqdone");
+            var lenEq = _builder.BuildICmp(LLVMIntPredicate.LLVMIntEQ, aLen, bLen, "lenEq");
+            _builder.BuildCondBr(lenEq, cmp, done);
+            _builder.PositionAtEnd(cmp);
+            var memcmp = StrExtern("memcmp", _ctx.Int32Type, ptr, ptr, _ctx.Int64Type);
+            var r = _builder.BuildCall2(memcmp.Type, memcmp.Fn, new[] { StringDataPtr(a), StringDataPtr(b), aLen }, "memcmp");
+            var byteEq = _builder.BuildICmp(LLVMIntPredicate.LLVMIntEQ, r, LLVMValueRef.CreateConstInt(_ctx.Int32Type, 0), "byteEq");
+            var cmpEnd = _builder.InsertBlock;
+            _builder.BuildBr(done);
+            _builder.PositionAtEnd(done);
+            var phi = _builder.BuildPhi(_ctx.Int1Type, "eq");
+            phi.AddIncoming(new[] { LLVMValueRef.CreateConstInt(_ctx.Int1Type, 0), byteEq }, new[] { entry, cmpEnd }, 2);
+            result = node.Operation == "!=" ? _builder.BuildNot(phi, "ne") : phi;
+        }
+        ReleaseTemp(node.Left, a);
+        ReleaseTemp(node.Right, b);
+        return result;
+    }
+
+    // The null-terminated byte pointer inside a String (data begins at offset 16 = rc:8 + len:8).
+    private LLVMValueRef StringDataPtr(LLVMValueRef strObj) =>
+        _builder.BuildInBoundsGEP2(_ctx.Int8Type, strObj,
+            new[] { LLVMValueRef.CreateConstInt(_ctx.Int64Type, 16) }, "str.data");
+
+    // calloc a String of `len` bytes (header 16 + len + trailing NUL), set rc=1 and len. All native LLVM
+    // over libc calloc -- no C shim. Bytes are left zeroed for the caller (memcpy) to fill.
+    private LLVMValueRef EmitStringAlloc(LLVMValueRef len)
+    {
+        var strType = _structs["String"].Type;
+        var size = _builder.BuildAdd(len, LLVMValueRef.CreateConstInt(_ctx.Int64Type, 17), "str.size");   // 16 header + len + NUL
+        var calloc = GetCalloc();
+        var obj = _builder.BuildCall2(calloc.Type, calloc.Fn,
+            new[] { LLVMValueRef.CreateConstInt(_ctx.Int64Type, 1), size }, "str");
+        _builder.BuildStore(LLVMValueRef.CreateConstInt(_ctx.Int64Type, 1), _builder.BuildStructGEP2(strType, obj, 0, "str.rc"));
+        _builder.BuildStore(len, _builder.BuildStructGEP2(strType, obj, 1, "str.len"));
+        return obj;
+    }
+
+    private LLVMValueRef EmitMemcpy(LLVMValueRef dest, LLVMValueRef src, LLVMValueRef n)
+    {
+        var ptr = LLVMTypeRef.CreatePointer(_ctx.Int8Type, 0);
+        var memcpy = StrExtern("memcpy", ptr, ptr, ptr, _ctx.Int64Type);
+        return _builder.BuildCall2(memcpy.Type, memcpy.Fn, new[] { dest, src, n }, "");
+    }
+
+    // String arguments passed to a `cstr` parameter are coerced to their data pointer (for FFI).
+    private LLVMValueRef[] CoerceCstrArgs(string callee, IReadOnlyList<Expr> argExprs, LLVMValueRef[] args)
+    {
+        if (!_cstrParams.TryGetValue(callee, out var cstrIdx)) return args;
+        var coerced = (LLVMValueRef[])args.Clone();
+        foreach (var i in cstrIdx)
+            if (i < argExprs.Count && ClassHeapOf(argExprs[i]) is { StructName: "String" })
+                coerced[i] = StringDataPtr(args[i]);
+        return coerced;
     }
 
     // Allocate a class on the heap, set refcount=1, run the ctor (fills fields), return the reference.
@@ -987,6 +1104,10 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         _functions[key] = callable;
         if (node.ReturnType is NamedType rt && _classNames.Contains(rt.Name)) _returnClass[key] = rt.Name;   // returns a class ref
         if (node.IsVariadic) _variadics[node.Name] = callable;   // callable at any arity >= fixed params
+        var cstrs = new HashSet<int>();
+        for (var i = 0; i < node.Params.Count; i++)
+            if (node.Params[i].Type is NamedType { Name: "cstr" }) cstrs.Add(i);   // String args here get coerced to their data ptr
+        if (cstrs.Count > 0) _cstrParams[node.Name] = cstrs;
     }
 
     public LLVMValueRef VisitFnDeclaration(FnDeclaration node)
@@ -1032,9 +1153,8 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
 
         if (pointee is { } heap)                                   // class local: owns +1, released at scope exit
         {
-            // +1 producers (new / a call returning a class) transfer ownership; a +0 borrow needs a retain
-            var isFresh = node.Initializer is NewExpr or CallExpr or MethodCall;
-            if (!isFresh) EmitRetain(value, heap);
+            // a +1 producer transfers ownership (no retain); a +0 borrow (alias/field) needs a retain
+            if (!IsFreshOwned(node.Initializer)) EmitRetain(value, heap);
             _scopes[^1].Add((node.Name, heap));
         }
         return value;
@@ -1181,22 +1301,23 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
             return ev;
         var key = new CallableKey("", node.Callee, args.Length);
         var enclosingNs = NamespaceOf(_builder.InsertBlock.Parent.Name);   // unqualified sibling call: bar() inside Foo -> Foo::bar
+        var callArgs = CoerceCstrArgs(node.Callee, node.Args, args);       // String -> data ptr for cstr params (FFI)
         LLVMValueRef result;
         if (_functions.TryGetValue(key, out var target))        // already a real fn? then call it
-            result = EmitCall(target, args);
+            result = EmitCall(target, callArgs);
         else if (enclosingNs != "" && _functions.TryGetValue(new CallableKey("", $"{enclosingNs}::{node.Callee}", args.Length), out var sibling))
-            result = EmitCall(sibling, args);
+            result = EmitCall(sibling, callArgs);
         else if (_variadics.TryGetValue(node.Callee, out var variadic))   // variadic fn: matches any call arity >= fixed
-            result = EmitCall(variadic, args);
+            result = EmitCall(variadic, callArgs);
         else if (_fnTemplates.TryGetValue(key, out var template)) // a recipe/template for a fn? build it, then call.
         {
             var substitutionEnv = InferTypeArgs(template, args.Select(arg => arg.TypeOf).ToArray());
-            result = EmitCall(Instantiate(template, substitutionEnv), args);
+            result = EmitCall(Instantiate(template, substitutionEnv), callArgs);
         }
         else
             throw new NotSupportedException($"no function '{node.Callee}' taking {args.Length} args");
 
-        ReleaseTemporaryArgs(node.Args, args);                   // drop any `new`/call temporaries passed inline
+        ReleaseTemporaryArgs(node.Args, args);                   // release String/class temporaries (originals, not coerced ptrs)
         return result;
     }
 
@@ -1207,6 +1328,10 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         // into one node kind (BinaryExpr) rather than two separate visitors.
         if (node.Operation is "&&" or "||")
             return EmitShortCircuit(node);
+
+        // String operands: `+` concatenates, `==`/`!=` compare bytes (via the runtime shim).
+        if (node.Operation is "+" or "==" or "!=" && ClassHeapOf(node.Left) is { StructName: "String" })
+            return EmitStringBinary(node);
 
         var left = node.Left.Accept(this);
         var right = node.Right.Accept(this);
