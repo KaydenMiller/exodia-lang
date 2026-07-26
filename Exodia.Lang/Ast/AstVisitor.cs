@@ -110,6 +110,13 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     private static string MangleType(LLVMTypeRef t) =>
         t.Kind == LLVMTypeKind.LLVMStructTypeKind ? t.StructName : t.ToString();
 
+    // The namespace part of a qualified name: "Foo::Bar::baz" -> "Foo::Bar", "baz" -> "".
+    private static string NamespaceOf(string name)
+    {
+        var i = name.LastIndexOf("::", StringComparison.Ordinal);
+        return i < 0 ? "" : name[..i];
+    }
+
     public static string Mangle(FnDeclaration template, Dictionary<string, LLVMTypeRef> env) =>
         $"{template.Name}${template.Params.Count}${string.Join("$", template.TypeParams.Select(tp => MangleType(env[tp.Name])))}";
 
@@ -367,8 +374,9 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     private LLVMValueRef? TryConstructEnum(string qualified, LLVMValueRef[] args)
     {
         var parts = qualified.Split("::");
-        if (parts.Length != 2) return null;
-        var (enumName, variantName) = (parts[0], parts[1]);
+        if (parts.Length < 2) return null;
+        // last segment is the variant; everything before it is the (possibly namespaced) enum name
+        var (enumName, variantName) = (string.Join("::", parts[..^1]), parts[^1]);
 
         if (_enums.TryGetValue(enumName, out var concrete) && concrete.Variants.TryGetValue(variantName, out var cv))
             return EmitEnumConstruct(concrete, cv, args);
@@ -900,6 +908,9 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         var key = new CallableKey("", node.Callee, args.Length);
         if (_functions.TryGetValue(key, out var target))        // already a real fn? then call it
             return EmitCall(target, args);
+        var enclosingNs = NamespaceOf(_builder.InsertBlock.Parent.Name);   // unqualified sibling call: bar() inside Foo -> Foo::bar
+        if (enclosingNs != "" && _functions.TryGetValue(new CallableKey("", $"{enclosingNs}::{node.Callee}", args.Length), out var sibling))
+            return EmitCall(sibling, args);
         if (_variadics.TryGetValue(node.Callee, out var variadic))   // variadic fn: matches any call arity >= fixed
             return EmitCall(variadic, args);
         if (_fnTemplates.TryGetValue(key, out var template)) // a recipe/template for a fn? build it, then call.

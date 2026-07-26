@@ -23,28 +23,71 @@ public class AstLowering
     internal static TextSpan Span(ParserRuleContext context)
         => new(context.Start.StartIndex, context.Stop.StopIndex - context.Start.StartIndex + 1);
 
+    private sealed record Collected(
+        List<FnDeclaration> Functions, List<StructDeclaration> Structs,
+        List<InterfaceDeclaration> Interfaces, List<ImplDeclaration> Impls, List<EnumDeclaration> Enums);
+
+    private static string Qualify(string prefix, string name) => prefix == "" ? name : $"{prefix}::{name}";
+
     public ProgramNode LowerProgram(ExodiaParser.ProgramContext context)
     {
-        var functions = new List<FnDeclaration>();
-        var structs = new List<StructDeclaration>();
-        var interfaces = new List<InterfaceDeclaration>();
-        var impls = new List<ImplDeclaration>();
-        var enums = new List<EnumDeclaration>();
+        var c = new Collected([], [], [], [], []);
         foreach (var statement in context.statement())
         {
             if (statement.function_declaration() is {} fn)
-                functions.Add(LowerFunction(fn));
+                c.Functions.Add(LowerFunction(fn));
             else if (statement.struct_declaration() is {} s)
-                structs.Add(LowerStruct(s));
+                c.Structs.Add(LowerStruct(s));
             else if (statement.interface_declaration() is {} i)
-                interfaces.Add(LowerInterface(i));
+                c.Interfaces.Add(LowerInterface(i));
             else if (statement.impl_declaration() is {} impl)
-                impls.Add(LowerImpl(impl));
+                c.Impls.Add(LowerImpl(impl));
             else if (statement.enum_declaration() is {} e)
-                enums.Add(LowerEnum(e));
+                c.Enums.Add(LowerEnum(e));
+            else if (statement.namespace_declaration() is {} ns)
+                LowerNamespace(ns, "", c);
         }
 
-        return new ProgramNode(functions, structs, interfaces, impls, enums, Span(context));
+        return new ProgramNode(c.Functions, c.Structs, c.Interfaces, c.Impls, c.Enums, Span(context));
+    }
+
+    // Flatten a namespace into the program's declaration lists, prefixing each member's name with
+    // the namespace path. A qualified reference already spells that prefix, so refs resolve for free.
+    private void LowerNamespace(ExodiaParser.Namespace_declarationContext ns, string parentPrefix, Collected c)
+    {
+        var prefix = Qualify(parentPrefix, ns.qualified_name().GetText());
+        foreach (var m in ns.namespace_member())
+        {
+            if (m.function_declaration() is {} fn)
+            {
+                var d = LowerFunction(fn);
+                // extern keeps its raw C symbol as LinkName; the Exodia name gets namespaced (§19)
+                c.Functions.Add(d with { Name = Qualify(prefix, d.Name), LinkName = d.IsExtern ? (d.LinkName ?? d.Name) : d.LinkName });
+            }
+            else if (m.struct_declaration() is {} s)
+            {
+                var d = LowerStruct(s);
+                c.Structs.Add(d with { Name = Qualify(prefix, d.Name) });
+            }
+            else if (m.enum_declaration() is {} e)
+            {
+                var d = LowerEnum(e);
+                c.Enums.Add(d with { Name = Qualify(prefix, d.Name) });
+            }
+            else if (m.interface_declaration() is {} i)
+            {
+                var d = LowerInterface(i);
+                c.Interfaces.Add(d with { Name = Qualify(prefix, d.Name) });
+            }
+            else if (m.impl_declaration() is {} impl)
+            {
+                var d = LowerImpl(impl);   // optimistic: assumes trait + target are in this namespace
+                c.Impls.Add(d with { InterfaceName = Qualify(prefix, d.InterfaceName), TargetType = Qualify(prefix, d.TargetType) });
+            }
+            else if (m.namespace_declaration() is {} nested)
+                LowerNamespace(nested, prefix, c);
+            // class_declaration deferred (classes not built yet)
+        }
     }
 
     private EnumDeclaration LowerEnum(ExodiaParser.Enum_declarationContext context)
