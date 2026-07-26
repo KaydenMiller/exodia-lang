@@ -44,6 +44,8 @@ public class AstLowering
                 c.Impls.Add(LowerImpl(impl));
             else if (statement.enum_declaration() is {} e)
                 c.Enums.Add(LowerEnum(e));
+            else if (statement.class_declaration() is {} cls)
+                c.Structs.Add(LowerClass(cls));
             else if (statement.namespace_declaration() is {} ns)
                 LowerNamespace(ns, "", c);
         }
@@ -84,9 +86,13 @@ public class AstLowering
                 var d = LowerImpl(impl);   // optimistic: assumes trait + target are in this namespace
                 c.Impls.Add(d with { InterfaceName = Qualify(prefix, d.InterfaceName), TargetType = Qualify(prefix, d.TargetType) });
             }
+            else if (m.class_declaration() is {} cls)
+            {
+                var d = LowerClass(cls);
+                c.Structs.Add(d with { Name = Qualify(prefix, d.Name) });
+            }
             else if (m.namespace_declaration() is {} nested)
                 LowerNamespace(nested, prefix, c);
-            // class_declaration deferred (classes not built yet)
         }
     }
 
@@ -200,11 +206,21 @@ public class AstLowering
     }
 
     private StructDeclaration LowerStruct(ExodiaParser.Struct_declarationContext context)
+        => LowerTypeBody(context.member(), context.identifier().GetText(),
+            LowerTypeParams(context.type_parameters(), context.where_clause()), false, Span(context));
+
+    // class shares struct's member shape; the differences (heap, refcount, reference semantics) are codegen.
+    private StructDeclaration LowerClass(ExodiaParser.Class_declarationContext context)
+        => LowerTypeBody(context.member(), context.identifier().GetText(),
+            LowerTypeParams(context.type_parameters(), context.where_clause()), true, Span(context));
+
+    private StructDeclaration LowerTypeBody(ExodiaParser.MemberContext[] members, string name,
+        IReadOnlyList<TypeParam> typeParams, bool isClass, TextSpan span)
     {
         var fields = new List<FieldDeclaration>();
         var constructors = new List<ConstructorDeclaration>();
         var methods = new List<MethodDeclaration>();
-        foreach (var member in context.member())
+        foreach (var member in members)
         {
             var kind = member.member_kind();
             if (kind.field_declaration() is {} f)
@@ -215,12 +231,7 @@ public class AstLowering
             else if (kind.method_declaration() is {} m)
                 methods.Add(LowerMethodDeclaration(m));   // reads m.type_parameters(), not the struct's
         }
-        return new StructDeclaration(context.identifier().GetText(),
-            LowerTypeParams(context.type_parameters(), context.where_clause()),
-            fields,
-            constructors,
-            methods,
-            Span(context));
+        return new StructDeclaration(name, typeParams, fields, constructors, methods, isClass, span);
     }
 
     private VariableDeclaration LowerVariableDeclaration(ExodiaParser.Variable_statementContext context)

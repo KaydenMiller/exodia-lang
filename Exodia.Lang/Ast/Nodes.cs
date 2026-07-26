@@ -68,6 +68,7 @@ public record StructDeclaration(
     IReadOnlyList<FieldDeclaration> Fields,
     IReadOnlyList<ConstructorDeclaration> Constructors,
     IReadOnlyList<MethodDeclaration> Methods,
+    bool IsClass,                              // class = heap + reference-counted (§17); struct = value
     TextSpan TextSpan);
 
 // --- struct expressions (visited) ---

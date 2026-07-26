@@ -39,7 +39,14 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     private readonly Dictionary<string, Symbol> _symbols = [];
     private readonly Dictionary<CallableKey, Callable> _functions = [];
     private readonly Dictionary<string, Callable> _variadics = [];   // variadic fns, keyed by name (call arity varies)
-    private readonly Dictionary<string, StructInfo> _structs = [];
+    private readonly Dictionary<string, StructInfo> _structs = [];   // classes live here too (heap layout {i64 rc, fields})
+    private readonly HashSet<string> _classNames = [];               // which _structs entries are classes (heap + RC)
+    // per class: its class-typed fields (index + field's class name) -> released when the object is freed.
+    private readonly Dictionary<string, List<(uint Index, string FieldClass)>> _classRefFields = [];
+    // owned class locals per lexical scope (a stack); released (rc--) at scope exit. §17 increment 2.
+    // swapped out during nested function/method emission so a nested `return` only releases its own scopes.
+    private List<List<(string Name, LLVMTypeRef Heap)>> _scopes = [];
+    private readonly Dictionary<CallableKey, string> _returnClass = [];   // callables whose return type is a class (opaque ptrs lose it)
     private readonly Dictionary<CallableKey, Callable> _constructors = [];
     private readonly Dictionary<CallableKey, Callable> _methods = [];
     private readonly Dictionary<string, InterfaceDeclaration> _interfaces = [];   // captured for dyn (increment B); no IR
@@ -74,8 +81,9 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
 
     public LLVMValueRef VisitProgram(ProgramNode node)
     {
-        foreach (var s in node.Structs)                               // phase 1: struct types + ctor/method decls
-            if (s.TypeParams.Count > 0) _structTemplates[s.Name] = s; //   generic -> park (no LLVM layout until T known)
+        foreach (var s in node.Structs)                               // phase 1: struct/class types + ctor/method decls
+            if (s.IsClass) RegisterClass(s);                          //   class -> heap {i64 rc, fields}, reference type
+            else if (s.TypeParams.Count > 0) _structTemplates[s.Name] = s; //   generic struct -> park
             else RegisterStruct(s);
         foreach (var e in node.Enums)                                 // phase 1a: enum tagged-union layouts
             if (e.TypeParams.Count > 0) _enumTemplates[e.Name] = e;   //   generic enums: concrete-only for now
@@ -135,7 +143,9 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         var savedBlock = _builder.InsertBlock;
         var savedSymbols = new Dictionary<string, Symbol>(_symbols);
         var savedEnv = _activeSubstitutionEnv;
-        
+        var savedScopes = _scopes;
+        _scopes = [];
+
         _activeSubstitutionEnv = substitutionEnv;
         DeclareFunction(concrete);
         var callableKey = new CallableKey("", mangled, concrete.Params.Count);
@@ -144,6 +154,7 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         concrete.Accept(this);
 
         _activeSubstitutionEnv = savedEnv;
+        _scopes = savedScopes;
         _symbols.Clear();
         foreach (var kv in savedSymbols)
         {
@@ -317,6 +328,64 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         foreach (var method in node.Methods) DeclareOrParkMethod(node.Name, structType, method);
     }
 
+    // A class is a heap object { i64 refcount, ...fields } referenced by pointer (§17). Field info is
+    // stored in _structs (indices shifted +1 past the refcount) so field/method resolution is shared;
+    // _classNames marks it a reference type. Methods reuse the struct path (`this` is a ptr either way).
+    private void RegisterClass(StructDeclaration node)
+    {
+        var heapType = _module.Context.CreateNamedStruct(node.Name);
+        _classNames.Add(node.Name);                                   // before fields, so self-referential fields resolve to ptr
+
+        var fieldTypes = new List<LLVMTypeRef> { _ctx.Int64Type };    // slot 0 = refcount
+        var fields = new Dictionary<string, StructInfoField>();
+        var refFields = new List<(uint, string)>();
+        uint index = 1;
+        foreach (var f in node.Fields)
+        {
+            var t = ResolveType(f.Type);
+            fields[f.Name] = new StructInfoField(index, t);
+            fieldTypes.Add(t);
+            if (f.Type is NamedType n && _classNames.Contains(n.Name))   // a class-typed field -> released on free
+                refFields.Add((index, n.Name));
+            index++;
+        }
+        heapType.StructSetBody(fieldTypes.ToArray(), false);
+        _structs[node.Name] = new StructInfo(heapType, fields);
+        _classRefFields[node.Name] = refFields;
+
+        foreach (var ctor in node.Constructors) DeclareClassConstructor(node.Name, heapType, ctor);
+        foreach (var method in node.Methods) DeclareOrParkMethod(node.Name, heapType, method);
+    }
+
+    // A class ctor takes `this` (the heap ptr) and returns void -- it fills fields in place, unlike a
+    // struct ctor which allocates on the stack and returns the value.
+    private void DeclareClassConstructor(string className, LLVMTypeRef heapType, ConstructorDeclaration ctor)
+    {
+        var name = ctor.Name ?? "";
+        var key = new CallableKey(className, name, ctor.Params.Count);
+        if (_constructors.ContainsKey(key))
+            throw new NotSupportedException($"'{className}' already has constructor '{name}' with {ctor.Params.Count} params");
+        var paramTypes = new LLVMTypeRef[ctor.Params.Count + 1];
+        paramTypes[0] = LLVMTypeRef.CreatePointer(heapType, 0);       // `this`
+        for (var i = 0; i < ctor.Params.Count; i++)
+            paramTypes[i + 1] = ResolveType(ctor.Params[i].Type);
+        var sig = LLVMTypeRef.CreateFunction(_ctx.VoidType, paramTypes);
+        var mangled = $"{className}.{(name == "" ? "ctor" : name)}.{ctor.Params.Count}";
+        _constructors[key] = new Callable(_module.AddFunction(mangled, sig), sig);
+    }
+
+    private void EmitClassConstructor(string className, ConstructorDeclaration ctor)
+    {
+        var heapType = _structs[className].Type;
+        var fn = _constructors[new CallableKey(className, ctor.Name ?? "", ctor.Params.Count)].Fn;
+        _builder.PositionAtEnd(fn.AppendBasicBlock("entry"));
+        _symbols.Clear();
+        _symbols["this"] = new Symbol(fn.GetParam(0), heapType);      // this = incoming heap ptr; fields GEP into heapType
+        BindParams(fn, ctor.Params, 1);
+        ctor.Body.Accept(this);
+        _builder.BuildRetVoid();
+    }
+
     // An enum lowers to { i32 tag, ...payload slots for every variant } (option A: sum-of-payloads).
     private void RegisterEnum(EnumDeclaration node)
     {
@@ -436,16 +505,19 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         for (var i = 0; i < method.Params.Count; i++)
             paramTypes[i + 1] = ResolveType(method.Params[i].Type);
         var sig = LLVMTypeRef.CreateFunction(ResolveType(method.ReturnType), paramTypes);
-        _methods[new CallableKey(structName, method.Name, method.Params.Count)] =
-            new Callable(_module.AddFunction($"{structName}.{method.Name}.{method.Params.Count}", sig), sig);
+        var key = new CallableKey(structName, method.Name, method.Params.Count);
+        _methods[key] = new Callable(_module.AddFunction($"{structName}.{method.Name}.{method.Params.Count}", sig), sig);
+        if (method.ReturnType is NamedType rt && _classNames.Contains(rt.Name)) _returnClass[key] = rt.Name;   // returns a class ref
     }
 
     private void EmitStructBodies(StructDeclaration node)
     {
-        foreach (var ctor in node.Constructors) EmitConstructor(node.Name, ctor);
+        foreach (var ctor in node.Constructors)
+            if (node.IsClass) EmitClassConstructor(node.Name, ctor);
+            else EmitConstructor(node.Name, ctor);
         foreach (var method in node.Methods)
             if (method.TypeParams.Count == 0)                                          // generic methods emit at call time
-                EmitMethod(node.Name, method);
+                EmitMethod(node.Name, method);                                         //   (class methods reuse EmitMethod)
     }
 
     private void EmitConstructor(string structName, ConstructorDeclaration ctor)
@@ -479,17 +551,176 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
             var t = ResolveType(parameters[i].Type);
             var slot = _builder.BuildAlloca(t, parameters[i].Name);
             _builder.BuildStore(fn.GetParam((uint)i + offset), slot);
-            _symbols[parameters[i].Name] = new Symbol(slot, t);
+            // a class param carries its heap struct for field/method access, but is BORROWED --
+            // NOT added to _scopes, so it isn't released here (the caller keeps it alive).
+            LLVMTypeRef? pointee = null;
+            if (parameters[i].Type is NamedType n && _classNames.Contains(n.Name))
+                pointee = _structs[n.Name].Type;
+            _symbols[parameters[i].Name] = new Symbol(slot, t, pointee);
         }
     }
 
     public LLVMValueRef VisitStringLiteral(StringLiteral node) =>
         _builder.BuildGlobalStringPtr(node.Value, "str");
 
+    // libc malloc, declared on demand (like GetPrintf).
+    private (LLVMValueRef Fn, LLVMTypeRef Type) GetMalloc()
+    {
+        var t = LLVMTypeRef.CreateFunction(LLVMTypeRef.CreatePointer(_ctx.Int8Type, 0), [_ctx.Int64Type]);
+        var e = _module.GetNamedFunction("malloc");
+        return e.Handle != IntPtr.Zero ? (e, t) : (_module.AddFunction("malloc", t), t);
+    }
+
+    private (LLVMValueRef Fn, LLVMTypeRef Type) GetFree()
+    {
+        var t = LLVMTypeRef.CreateFunction(_ctx.VoidType, [LLVMTypeRef.CreatePointer(_ctx.Int8Type, 0)]);
+        var e = _module.GetNamedFunction("free");
+        return e.Handle != IntPtr.Zero ? (e, t) : (_module.AddFunction("free", t), t);
+    }
+
+    // calloc zero-inits the object -> class-typed fields start as null pointers, so releasing an
+    // uninitialized field (via the null-guard in EmitRelease) is a safe no-op.
+    private (LLVMValueRef Fn, LLVMTypeRef Type) GetCalloc()
+    {
+        var t = LLVMTypeRef.CreateFunction(LLVMTypeRef.CreatePointer(_ctx.Int8Type, 0), [_ctx.Int64Type, _ctx.Int64Type]);
+        var e = _module.GetNamedFunction("calloc");
+        return e.Handle != IntPtr.Zero ? (e, t) : (_module.AddFunction("calloc", t), t);
+    }
+
+    // sizeof(heapType) as an i64, target-computed via the gep-of-null trick (no DataLayout needed).
+    private LLVMValueRef SizeOf(LLVMTypeRef heapType)
+    {
+        var nullPtr = LLVMValueRef.CreateConstPointerNull(LLVMTypeRef.CreatePointer(_ctx.Int8Type, 0));
+        var indices = new[] { LLVMValueRef.CreateConstInt(_ctx.Int32Type, 1) };
+        var end = _builder.BuildInBoundsGEP2(heapType, nullPtr, indices, "size.ptr");
+        return _builder.BuildPtrToInt(end, _ctx.Int64Type, "size");
+    }
+
+    // --- reference counting (§17). Centralized so increment 2 swaps non-atomic -> atomic in ONE place,
+    //     and inserts EmitRetain/EmitRelease at bindings/scope-exit. Increment 1 only initializes to 1. ---
+    private void EmitRefcountInit(LLVMValueRef obj, LLVMTypeRef heapType) =>
+        _builder.BuildStore(LLVMValueRef.CreateConstInt(_ctx.Int64Type, 1),
+            _builder.BuildStructGEP2(heapType, obj, 0, "rc"));
+
+    // rc++  (non-atomic for now; the single place to make atomic for the concurrency increment)
+    private void EmitRetain(LLVMValueRef obj, LLVMTypeRef heapType)
+    {
+        var rcPtr = _builder.BuildStructGEP2(heapType, obj, 0, "rc.ptr");
+        var next = _builder.BuildAdd(_builder.BuildLoad2(_ctx.Int64Type, rcPtr, "rc"),
+            LLVMValueRef.CreateConstInt(_ctx.Int64Type, 1), "rc.inc");
+        _builder.BuildStore(next, rcPtr);
+    }
+
+    // rc--; free the object when it hits 0.
+    private void EmitRelease(LLVMValueRef obj, LLVMTypeRef heapType)
+    {
+        var fn = _builder.InsertBlock.Parent;
+        var liveBlock = fn.AppendBasicBlock("rc.live");   // obj != null
+        var freeBlock = fn.AppendBasicBlock("rc.free");   // rc hit 0
+        var contBlock = fn.AppendBasicBlock("rc.cont");
+
+        // null-guard: releasing an uninitialized (null) field/ref is a no-op
+        _builder.BuildCondBr(_builder.BuildIsNull(obj, "rc.null"), contBlock, liveBlock);
+
+        _builder.PositionAtEnd(liveBlock);
+        var rcPtr = _builder.BuildStructGEP2(heapType, obj, 0, "rc.ptr");
+        var next = _builder.BuildSub(_builder.BuildLoad2(_ctx.Int64Type, rcPtr, "rc"),
+            LLVMValueRef.CreateConstInt(_ctx.Int64Type, 1), "rc.dec");
+        _builder.BuildStore(next, rcPtr);
+        _builder.BuildCondBr(
+            _builder.BuildICmp(LLVMIntPredicate.LLVMIntEQ, next, LLVMValueRef.CreateConstInt(_ctx.Int64Type, 0), "rc.zero"),
+            freeBlock, contBlock);
+
+        _builder.PositionAtEnd(freeBlock);
+        // an object owns its class-typed fields -> release them before freeing (recursive drop)
+        if (_classRefFields.TryGetValue(heapType.StructName, out var refFields))
+            foreach (var (fieldIndex, fieldClass) in refFields)
+            {
+                var fieldHeap = _structs[fieldClass].Type;
+                var fieldPtr = _builder.BuildLoad2(LLVMTypeRef.CreatePointer(_ctx.Int8Type, 0),
+                    _builder.BuildStructGEP2(heapType, obj, fieldIndex, "field.ptr"), "field");
+                EmitRelease(fieldPtr, fieldHeap);
+            }
+        var free = GetFree();
+        _builder.BuildCall2(free.Type, free.Fn, new[] { obj }, "");
+        _builder.BuildBr(contBlock);
+
+        _builder.PositionAtEnd(contBlock);
+    }
+
+    // Release every owned class local in one scope (skip `except` -- a value being transferred out).
+    private void ReleaseScope(List<(string Name, LLVMTypeRef Heap)> scope, string? except = null)
+    {
+        foreach (var (name, heap) in scope)
+        {
+            if (name == except) continue;
+            var sym = _symbols[name];
+            EmitRelease(_builder.BuildLoad2(sym.Type, sym.Slot, name), heap);   // load the heap ptr, then rc--
+        }
+    }
+
+    // Release owned class locals across ALL live scopes (used at `return`, which exits every scope).
+    private void ReleaseAllScopes(string? except = null)
+    {
+        for (var i = _scopes.Count - 1; i >= 0; i--)
+            ReleaseScope(_scopes[i], except);
+    }
+
+    // The heap struct a class-valued expression points at, or null if it isn't a (recognizable) class ref.
+    // if/else, not ?: -- LLVMTypeRef converts a null ptr to default, so a ?: with null misbehaves.
+    private LLVMTypeRef? ClassHeapOf(Expr e)
+    {
+        if (e is NewExpr n && _classNames.Contains(n.StructName)) return _structs[n.StructName].Type;
+        if (e is NameRef r && _symbols.TryGetValue(r.Name, out var s) && s.Pointee is { } h) return h;
+        if (e is CallExpr c && _returnClass.TryGetValue(new CallableKey("", c.Callee, c.Args.Count), out var rc)) return _structs[rc].Type;
+        if (e is ThisExpr && _symbols.TryGetValue("this", out var t) && _classNames.Contains(t.Type.StructName)) return t.Type;
+        if (e is FieldAccess fa)                                    // a class-typed field: receiver's class -> field's class
+        {
+            var recvHeap = fa.Target is ThisExpr ? (_symbols.TryGetValue("this", out var th) ? th.Type : (LLVMTypeRef?)null) : ClassHeapOf(fa.Target);
+            if (recvHeap is { } rh && _structs.TryGetValue(rh.StructName, out var info)
+                && info.Fields.TryGetValue(fa.FieldName, out var fld)
+                && _classRefFields.TryGetValue(rh.StructName, out var refs)
+                && refs.FirstOrDefault(x => x.Index == fld.Index).FieldClass is { } fc)
+                return _structs[fc].Type;
+        }
+        return null;   // method-call class-values deferred
+    }
+
+    // A class temporary (a `new`/call producing +1, passed inline as an argument rather than bound to a
+    // local) must be released after the call -- otherwise its +1 is orphaned and leaks.
+    private void ReleaseTemporaryArgs(IReadOnlyList<Expr> argExprs, LLVMValueRef[] argVals)
+    {
+        for (var i = 0; i < argExprs.Count; i++)
+            if (argExprs[i] is NewExpr or CallExpr && ClassHeapOf(argExprs[i]) is { } heap)
+                EmitRelease(argVals[i], heap);
+    }
+
+    // Allocate a class on the heap, set refcount=1, run the ctor (fills fields), return the reference.
+    private LLVMValueRef EmitNewClass(string className, string ctorName, LLVMValueRef[] args)
+    {
+        var heapType = _structs[className].Type;
+        var calloc = GetCalloc();
+        var callArgs = new[] { LLVMValueRef.CreateConstInt(_ctx.Int64Type, 1), SizeOf(heapType) };
+        var obj = _builder.BuildCall2(calloc.Type, calloc.Fn, callArgs, $"{className}.new");   // zero-init -> null fields
+        EmitRefcountInit(obj, heapType);
+        if (!_constructors.TryGetValue(new CallableKey(className, ctorName, args.Length), out var ctor))
+            throw new NotSupportedException($"class '{className}' has no constructor '{ctorName}' taking {args.Length} args");
+        var ctorArgs = new[] { obj }.Concat(args).ToArray();
+        _builder.BuildCall2(ctor.Signature, ctor.Fn, ctorArgs, "");   // void; fills fields
+        return obj;
+    }
+
     public LLVMValueRef VisitNew(NewExpr node)
     {
         var args = node.Args.Select(a => a.Accept(this)).ToArray();
         var ctorName = node.ConstructorName ?? "";
+
+        if (_classNames.Contains(node.StructName))                                     // class: heap-allocate + ctor
+        {
+            var obj = EmitNewClass(node.StructName, ctorName, args);
+            ReleaseTemporaryArgs(node.Args, args);
+            return obj;
+        }
 
         if (!_structs.TryGetValue(node.StructName, out var info))
         {
@@ -553,6 +784,8 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         var savedBlock = _builder.InsertBlock;
         var savedSymbols = new Dictionary<string, Symbol>(_symbols);
         var savedEnv = _activeSubstitutionEnv;
+        var savedScopes = _scopes;
+        _scopes = [];
 
         _activeSubstitutionEnv = composed;
         DeclareMethod(owner, structType, concrete);          // adds _methods[key]
@@ -560,6 +793,7 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         EmitMethod(owner, concrete);
 
         _activeSubstitutionEnv = savedEnv;
+        _scopes = savedScopes;
         _symbols.Clear();
         foreach (var kv in savedSymbols) _symbols[kv.Key] = kv.Value;
         if (savedBlock.Handle != IntPtr.Zero) _builder.PositionAtEnd(savedBlock);
@@ -578,15 +812,20 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         for (var i = 0; i < node.Args.Count; i++)
             args[i + 1] = node.Args[i].Accept(this);
         var key = new CallableKey(structName, node.MethodName, node.Args.Count);
+        LLVMValueRef result;
         if (_methods.TryGetValue(key, out var m))                                     // concrete or already-instantiated
-            return _builder.BuildCall2(m.Signature, m.Fn, args, $"{structName}.{node.MethodName}.call");
-        if (_methodTemplates.TryGetValue(key, out var template))                      // generic method: infer -> instantiate
+            result = _builder.BuildCall2(m.Signature, m.Fn, args, $"{structName}.{node.MethodName}.call");
+        else if (_methodTemplates.TryGetValue(key, out var template))                 // generic method: infer -> instantiate
         {
             var methodEnv = InferMethodTypeArgs(template.Method, args.Skip(1).Select(a => a.TypeOf).ToArray());
             var instance = InstantiateMethod(structName, structType, template.Method, template.StructEnv, methodEnv);
-            return _builder.BuildCall2(instance.Signature, instance.Fn, args, $"{structName}.{node.MethodName}.call");
+            result = _builder.BuildCall2(instance.Signature, instance.Fn, args, $"{structName}.{node.MethodName}.call");
         }
-        throw new NotSupportedException($"struct '{structName}' has no method '{node.MethodName}' taking {node.Args.Count} args");
+        else
+            throw new NotSupportedException($"struct '{structName}' has no method '{node.MethodName}' taking {node.Args.Count} args");
+
+        ReleaseTemporaryArgs(node.Args, args.Skip(1).ToArray());                       // node.Args map to args[1..]
+        return result;
     }
 
     public LLVMValueRef VisitThis(ThisExpr node)
@@ -711,7 +950,10 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
 
     private (LLVMValueRef Ptr, LLVMTypeRef StructType) ResolveStructPointer(Expr target) => target switch
     {
-        NameRef n when _symbols.TryGetValue(n.Name, out var sym) => (sym.Slot, sym.Type),
+        // class ref: the slot holds a heap pointer -> load it; the loaded ptr is the object to GEP into.
+        NameRef n when _symbols.TryGetValue(n.Name, out var sym) && sym.Pointee is { } heap
+            => (_builder.BuildLoad2(sym.Type, sym.Slot, n.Name), heap),
+        NameRef n when _symbols.TryGetValue(n.Name, out var sym) => (sym.Slot, sym.Type),  // struct value: the alloca is the base
         ThisExpr => (_symbols["this"].Slot, _symbols["this"].Type),
         _ => throw new NotSupportedException($"cannot resolve struct pointer for {target}")
     };
@@ -741,7 +983,9 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         var fnType = LLVMTypeRef.CreateFunction(ResolveType(node.ReturnType), paramTypes, node.IsVariadic);
         var fn = _module.AddFunction(node.LinkName ?? node.Name, fnType);
         var callable = new Callable(fn, fnType);
-        _functions[new CallableKey("", node.Name, node.Params.Count)] = callable;
+        var key = new CallableKey("", node.Name, node.Params.Count);
+        _functions[key] = callable;
+        if (node.ReturnType is NamedType rt && _classNames.Contains(rt.Name)) _returnClass[key] = rt.Name;   // returns a class ref
         if (node.IsVariadic) _variadics[node.Name] = callable;   // callable at any arity >= fixed params
     }
 
@@ -749,17 +993,9 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     {
         var key = new CallableKey("", node.Name, node.Params.Count);
         var fn = _functions[key].Fn;
-        var paramTypes = node.Params
-            .Select(p => ResolveType(p.Type))
-            .ToArray();
         _builder.PositionAtEnd(fn.AppendBasicBlock("entry"));
         _symbols.Clear();
-        for (var i = 0; i < node.Params.Count; i++)
-        {
-            var slot = _builder.BuildAlloca(paramTypes[i], node.Params[i].Name);
-            _builder.BuildStore(fn.GetParam((uint)i), slot);
-            _symbols[node.Params[i].Name] = new Symbol(slot, paramTypes[i]);
-        }
+        BindParams(fn, node.Params, 0);                          // shared: also sets class-param pointees (borrowed)
         node.Body!.Accept(this);
         // if control falls off the end without a terminator: a unit/void fn returns; anything else
         // is a dead merge block (e.g. both if-arms returned) -> unreachable to keep the IR valid.
@@ -786,7 +1022,21 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         var type = declared ?? value.TypeOf;
         var slot = _builder.BuildAlloca(type, node.Name);
         _builder.BuildStore(value, slot);
-        _symbols[node.Name] = new Symbol(slot, type);
+        // for a class ref, remember the heap struct it points at (annotation wins, else infer from the initializer).
+        LLVMTypeRef? pointee = null;
+        if (node.Type is NamedType nt && _classNames.Contains(nt.Name))
+            pointee = _structs[nt.Name].Type;
+        else
+            pointee = ClassHeapOf(node.Initializer);               // new / alias / call-returning-a-class
+        _symbols[node.Name] = new Symbol(slot, type, pointee);
+
+        if (pointee is { } heap)                                   // class local: owns +1, released at scope exit
+        {
+            // +1 producers (new / a call returning a class) transfer ownership; a +0 borrow needs a retain
+            var isFresh = node.Initializer is NewExpr or CallExpr or MethodCall;
+            if (!isFresh) EmitRetain(value, heap);
+            _scopes[^1].Add((node.Name, heap));
+        }
         return value;
     }
 
@@ -801,8 +1051,13 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
 
     public LLVMValueRef VisitBlock(Block node)
     {
+        _scopes.Add([]);
         foreach (var statement in node.Statements)
             statement.Accept(this);
+        // normal fall-through exit (a `return` already released every scope) -> release this scope's locals
+        if (_builder.InsertBlock.Terminator.Handle == IntPtr.Zero)
+            ReleaseScope(_scopes[^1]);
+        _scopes.RemoveAt(_scopes.Count - 1);
         return default;
     }
 
@@ -842,8 +1097,17 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     public LLVMValueRef VisitReturn(ReturnStatement node)
     {
         if (node.Value is null or UnitLiteral)                    // `return;` or `return unit;` -> void
+        {
+            ReleaseAllScopes();
             return _builder.BuildRetVoid();
-        return _builder.BuildRet(node.Value.Accept(this));
+        }
+        var value = node.Value.Accept(this);
+        // returning a class local transfers its +1 to the caller -> don't release that one.
+        // (returning `new`/a call is already +1 and isn't a tracked local, so nothing special.)
+        var transferred = node.Value is NameRef nr && _symbols.TryGetValue(nr.Name, out var s) && s.Pointee is not null
+            ? nr.Name : null;
+        ReleaseAllScopes(transferred);
+        return _builder.BuildRet(value);
     }
 
     // The Unit value only lives in return position for now (handled in VisitReturn before it gets
@@ -854,7 +1118,17 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     public LLVMValueRef VisitAssignmentExpr(AssignExpr node)
     {
         var value = node.Value.Accept(this);
-        _builder.BuildStore(value, ResolveLValue(node.Target));
+        var target = ResolveLValue(node.Target);
+        // storing a class ref into a slot/field: that slot becomes an owner -> release the old value
+        // (null-safe; fields are calloc'd to null), store, then retain the new. §17 increment 2b.
+        if (ClassHeapOf(node.Value) is { } heap)
+        {
+            EmitRelease(_builder.BuildLoad2(LLVMTypeRef.CreatePointer(_ctx.Int8Type, 0), target, "old"), heap);
+            _builder.BuildStore(value, target);
+            EmitRetain(value, heap);
+        }
+        else
+            _builder.BuildStore(value, target);
         return value;
     }
 
@@ -906,20 +1180,24 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         if (node.Callee.Contains("::") && TryConstructEnum(node.Callee, args) is { } ev)   // enum construction: Option::Some(5)
             return ev;
         var key = new CallableKey("", node.Callee, args.Length);
-        if (_functions.TryGetValue(key, out var target))        // already a real fn? then call it
-            return EmitCall(target, args);
         var enclosingNs = NamespaceOf(_builder.InsertBlock.Parent.Name);   // unqualified sibling call: bar() inside Foo -> Foo::bar
-        if (enclosingNs != "" && _functions.TryGetValue(new CallableKey("", $"{enclosingNs}::{node.Callee}", args.Length), out var sibling))
-            return EmitCall(sibling, args);
-        if (_variadics.TryGetValue(node.Callee, out var variadic))   // variadic fn: matches any call arity >= fixed
-            return EmitCall(variadic, args);
-        if (_fnTemplates.TryGetValue(key, out var template)) // a recipe/template for a fn? build it, then call.
+        LLVMValueRef result;
+        if (_functions.TryGetValue(key, out var target))        // already a real fn? then call it
+            result = EmitCall(target, args);
+        else if (enclosingNs != "" && _functions.TryGetValue(new CallableKey("", $"{enclosingNs}::{node.Callee}", args.Length), out var sibling))
+            result = EmitCall(sibling, args);
+        else if (_variadics.TryGetValue(node.Callee, out var variadic))   // variadic fn: matches any call arity >= fixed
+            result = EmitCall(variadic, args);
+        else if (_fnTemplates.TryGetValue(key, out var template)) // a recipe/template for a fn? build it, then call.
         {
             var substitutionEnv = InferTypeArgs(template, args.Select(arg => arg.TypeOf).ToArray());
-            var instance = Instantiate(template, substitutionEnv);
-            return EmitCall(instance, args);
+            result = EmitCall(Instantiate(template, substitutionEnv), args);
         }
-        throw new NotSupportedException($"no function '{node.Callee}' taking {args.Length} args");
+        else
+            throw new NotSupportedException($"no function '{node.Callee}' taking {args.Length} args");
+
+        ReleaseTemporaryArgs(node.Args, args);                   // drop any `new`/call temporaries passed inline
+        return result;
     }
 
     public LLVMValueRef VisitBinary(BinaryExpr node)
@@ -1072,7 +1350,8 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     private LLVMTypeRef ResolveType(TypeRef type) => type switch
     {
         NamedType n when _activeSubstitutionEnv.TryGetValue(n.Name, out var bound) => bound,  // type param -> concrete
-        NamedType n when _structs.TryGetValue(n.Name, out var info) => info.Type,   // struct name -> %Struct
+        NamedType n when _classNames.Contains(n.Name) => LLVMTypeRef.CreatePointer(_ctx.Int8Type, 0),  // class = reference (ptr)
+        NamedType n when _structs.TryGetValue(n.Name, out var info) => info.Type,   // struct name -> %Struct (value)
         NamedType n => AstHelpers.MapPrimitiveType(_ctx, n.Name),
         DynType d => GetDynType(d.InterfaceName),
         GenericType g => ResolveGenericType(g),                                     // Box<int32> -> %Box$i32

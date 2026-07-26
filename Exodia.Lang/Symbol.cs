@@ -7,4 +7,5 @@ namespace Exodia.Lang;
 // element type stored there (opaque pointers don't carry the pointee type).
 public sealed record Symbol(
     LLVMValueRef Slot,
-    LLVMTypeRef Type);
+    LLVMTypeRef Type,
+    LLVMTypeRef? Pointee = null);   // for class references: the heap struct %C the ptr points at (opaque ptrs lose it)
