@@ -20,6 +20,8 @@ public record DynType(string InterfaceName, TextSpan TextSpan) : TypeRef(TextSpa
 // A generic type application written in a type position, e.g. `Box<int32>` or `Box<T>`.
 // TypeArgs may themselves be type parameters (resolved via the active substitution env).
 public record GenericType(string Name, IReadOnlyList<TypeRef> TypeArgs, TextSpan TextSpan) : TypeRef(TextSpan);
+// `T[]` -- an array of Element. An RC-managed reference type: { i64 rc, i64 len, [len x Element] } inline.
+public record ArrayType(TypeRef Element, TextSpan TextSpan) : TypeRef(TextSpan);
 
 public record TypeParam(string Name, IReadOnlyList<string> Bounds, TextSpan TextSpan);
 
@@ -122,6 +124,17 @@ public record NameRef(string Name, TextSpan TextSpan) : Expr(TextSpan)
 public record UnitLiteral(TextSpan TextSpan) : Expr(TextSpan)
 {
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitUnitLiteral(this);
+}
+
+// `[a, b, c]` -- builds an Array from its elements.
+public record ArrayLiteral(IReadOnlyList<Expr> Elements, TextSpan TextSpan) : Expr(TextSpan)
+{
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitArrayLiteral(this);
+}
+// `target[index]` -- array element read.
+public record IndexExpr(Expr Target, Expr Index, TextSpan TextSpan) : Expr(TextSpan)
+{
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.VisitIndex(this);
 }
 
 public record Block(IReadOnlyList<Statement> Statements, TextSpan TextSpan) : Statement(TextSpan)

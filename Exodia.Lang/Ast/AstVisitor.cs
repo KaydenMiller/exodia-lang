@@ -10,6 +10,8 @@ public interface IAstVisitor<T>
     T VisitVariableDeclaration(VariableDeclaration node);
     T VisitNameRef(NameRef node);
     T VisitUnitLiteral(UnitLiteral node);
+    T VisitArrayLiteral(ArrayLiteral node);
+    T VisitIndex(IndexExpr node);
     T VisitBlock(Block node);
     T VisitIf(IfStatement node);
     T VisitReturn(ReturnStatement node);
@@ -43,6 +45,9 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     private readonly HashSet<string> _classNames = [];               // which _structs entries are classes (heap + RC)
     // per class: its class-typed fields (index + field's class name) -> released when the object is freed.
     private readonly Dictionary<string, List<(uint Index, string FieldClass)>> _classRefFields = [];
+    // per array instantiation ("Array$i32"): element LLVM type + (if the element is a reference) its heap type
+    // to release on free. Opaque ptrs lose the element type, so we track it here.
+    private readonly Dictionary<string, (LLVMTypeRef Elem, LLVMTypeRef? RefHeap)> _arrayElem = [];
     // owned class locals per lexical scope (a stack); released (rc--) at scope exit. §17 increment 2.
     // swapped out during nested function/method emission so a nested `return` only releases its own scopes.
     private List<List<(string Name, LLVMTypeRef Heap)>> _scopes = [];
@@ -91,6 +96,29 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         _structs["String"] = new StructInfo(t, new Dictionary<string, StructInfoField> { ["length"] = new StructInfoField(1, _ctx.Int64Type) });
         _classNames.Add("String");
         _classRefFields["String"] = [];                             // no class-typed fields to recurse on
+    }
+
+    // T[] -- an RC-managed reference type sharing String's header { i64 rc, i64 len } with `T` elements
+    // inline after it. Registered as a class (per element type) so it reuses the whole RC path.
+    private LLVMTypeRef InstantiateArray(LLVMTypeRef elem, LLVMTypeRef? refHeap)
+    {
+        var mangled = "Array$" + MangleType(refHeap ?? elem);   // Array$i32, Array$String (ref: by class name)
+        if (_structs.TryGetValue(mangled, out var cached)) return cached.Type;
+        var t = _ctx.CreateNamedStruct(mangled);
+        t.StructSetBody([_ctx.Int64Type, _ctx.Int64Type], false);   // { rc, len }; elements inline after (offset 16)
+        _structs[mangled] = new StructInfo(t, new Dictionary<string, StructInfoField> { ["length"] = new StructInfoField(1, _ctx.Int64Type) });
+        _classNames.Add(mangled);
+        _classRefFields[mangled] = [];
+        _arrayElem[mangled] = (elem, refHeap);
+        return t;
+    }
+
+    // The (LLVM element type, ref heap type if a reference) of an array element declared as `elemRef`.
+    private (LLVMTypeRef Elem, LLVMTypeRef? RefHeap) ResolveElement(TypeRef elemRef)
+    {
+        if (elemRef is NamedType n && _classNames.Contains(n.Name))
+            return (LLVMTypeRef.CreatePointer(_ctx.Int8Type, 0), _structs[n.Name].Type);   // reference element
+        return (ResolveType(elemRef), null);   // value element (nested arrays deferred)
     }
 
     private (LLVMValueRef Fn, LLVMTypeRef Type) StrExtern(string name, LLVMTypeRef ret, params LLVMTypeRef[] ps)
@@ -668,6 +696,28 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
                     _builder.BuildStructGEP2(heapType, obj, fieldIndex, "field.ptr"), "field");
                 EmitRelease(fieldPtr, fieldHeap);
             }
+        // an array of references owns its elements -> release each before freeing (loop over len)
+        if (_arrayElem.TryGetValue(heapType.StructName, out var ai) && ai.RefHeap is { } elemHeap)
+        {
+            var ptr = LLVMTypeRef.CreatePointer(_ctx.Int8Type, 0);
+            var len = _builder.BuildLoad2(_ctx.Int64Type, _builder.BuildStructGEP2(heapType, obj, 1, "arr.len"), "len");
+            var data = _builder.BuildInBoundsGEP2(_ctx.Int8Type, obj, new[] { LLVMValueRef.CreateConstInt(_ctx.Int64Type, 16) }, "arr.data");
+            var iSlot = _builder.BuildAlloca(_ctx.Int64Type, "i");
+            _builder.BuildStore(LLVMValueRef.CreateConstInt(_ctx.Int64Type, 0), iSlot);
+            var cond = fn.AppendBasicBlock("arr.rel.cond");
+            var body = fn.AppendBasicBlock("arr.rel.body");
+            var done = fn.AppendBasicBlock("arr.rel.done");
+            _builder.BuildBr(cond);
+            _builder.PositionAtEnd(cond);
+            var i = _builder.BuildLoad2(_ctx.Int64Type, iSlot, "i");
+            _builder.BuildCondBr(_builder.BuildICmp(LLVMIntPredicate.LLVMIntSLT, i, len, "i.lt"), body, done);
+            _builder.PositionAtEnd(body);
+            var elemPtr = _builder.BuildLoad2(ptr, _builder.BuildInBoundsGEP2(ai.Elem, data, new[] { i }, "arr.slot"), "arr.elem");
+            EmitRelease(elemPtr, elemHeap);
+            _builder.BuildStore(_builder.BuildAdd(i, LLVMValueRef.CreateConstInt(_ctx.Int64Type, 1), "i.next"), iSlot);
+            _builder.BuildBr(cond);
+            _builder.PositionAtEnd(done);
+        }
         var free = GetFree();
         _builder.BuildCall2(free.Type, free.Fn, new[] { obj }, "");
         _builder.BuildBr(contBlock);
@@ -699,6 +749,8 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     {
         if (e is StringLiteral) return _structs["String"].Type;    // "..." is a String
         if (e is BinaryExpr { Operation: "+" } b && ClassHeapOf(b.Left) is { StructName: "String" }) return _structs["String"].Type;   // String concat
+        if (e is ArrayLiteral { Elements.Count: > 0 } al) { var (elem, refHeap) = StaticElementOf(al.Elements[0]); return InstantiateArray(elem, refHeap); }
+        if (e is IndexExpr ix && ClassHeapOf(ix.Target) is { } arrHeap && _arrayElem.TryGetValue(arrHeap.StructName, out var ael) && ael.RefHeap is { } eh) return eh;   // arr[i] of a ref-element array
         if (e is NewExpr n && _classNames.Contains(n.StructName)) return _structs[n.StructName].Type;
         if (e is NameRef r && _symbols.TryGetValue(r.Name, out var s) && s.Pointee is { } h) return h;
         if (e is CallExpr c && _returnClass.TryGetValue(new CallableKey("", c.Callee, c.Args.Count), out var rc)) return _structs[rc].Type;
@@ -718,7 +770,7 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
     // A "+1 producer" yields an OWNED value (new / call / method call / string literal / string concat).
     // Bound to a local -> transfers ownership; passed inline / as an operand -> a temporary to release.
     private bool IsFreshOwned(Expr e) =>
-        e is NewExpr or CallExpr or MethodCall or StringLiteral
+        e is NewExpr or CallExpr or MethodCall or StringLiteral or ArrayLiteral
         || (e is BinaryExpr { Operation: "+" } b && ClassHeapOf(b.Left) is { StructName: "String" });
 
     private void ReleaseTemp(Expr e, LLVMValueRef v)
@@ -799,6 +851,57 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         var ptr = LLVMTypeRef.CreatePointer(_ctx.Int8Type, 0);
         var memcpy = StrExtern("memcpy", ptr, ptr, ptr, _ctx.Int64Type);
         return _builder.BuildCall2(memcpy.Type, memcpy.Fn, new[] { dest, src, n }, "");
+    }
+
+    // The element type of an array literal, inferred from its first element (without evaluating it).
+    private (LLVMTypeRef Elem, LLVMTypeRef? RefHeap) StaticElementOf(Expr e)
+    {
+        var ptr = LLVMTypeRef.CreatePointer(_ctx.Int8Type, 0);
+        if (ClassHeapOf(e) is { } h) return (ptr, h);                              // ref element (String / class / array)
+        if (e is IntLiteral il) return (il.Type is { } t ? ResolveType(t) : _ctx.Int32Type, null);
+        if (e is FloatLiteral fl) return (fl.Type is { } t ? ResolveType(t) : _ctx.DoubleType, null);
+        if (e is BoolLiteral) return (_ctx.Int1Type, null);
+        if (e is CastExpr c) return (ResolveType(c.Target), null);
+        if (e is NameRef n && _symbols.TryGetValue(n.Name, out var s)) return s.Pointee is { } p ? (ptr, p) : (s.Type, null);
+        return (_ctx.Int32Type, null);
+    }
+
+    public LLVMValueRef VisitArrayLiteral(ArrayLiteral node)
+    {
+        if (node.Elements.Count == 0)
+            throw new NotSupportedException("empty array literal needs an element-type annotation (not supported yet)");
+        var (elem, refHeap) = StaticElementOf(node.Elements[0]);
+        var headerType = InstantiateArray(elem, refHeap);
+        var n = node.Elements.Count;
+
+        var size = _builder.BuildAdd(LLVMValueRef.CreateConstInt(_ctx.Int64Type, 16),
+            _builder.BuildMul(LLVMValueRef.CreateConstInt(_ctx.Int64Type, (ulong)n), SizeOf(elem), "arr.bytes"), "arr.size");
+        var calloc = GetCalloc();
+        var obj = _builder.BuildCall2(calloc.Type, calloc.Fn,
+            new[] { LLVMValueRef.CreateConstInt(_ctx.Int64Type, 1), size }, "arr");
+        _builder.BuildStore(LLVMValueRef.CreateConstInt(_ctx.Int64Type, 1), _builder.BuildStructGEP2(headerType, obj, 0, "arr.rc"));
+        _builder.BuildStore(LLVMValueRef.CreateConstInt(_ctx.Int64Type, (ulong)n), _builder.BuildStructGEP2(headerType, obj, 1, "arr.len"));
+
+        var data = _builder.BuildInBoundsGEP2(_ctx.Int8Type, obj, new[] { LLVMValueRef.CreateConstInt(_ctx.Int64Type, 16) }, "arr.data");
+        for (var i = 0; i < n; i++)
+        {
+            var v = node.Elements[i].Accept(this);
+            var slot = _builder.BuildInBoundsGEP2(elem, data, new[] { LLVMValueRef.CreateConstInt(_ctx.Int64Type, (ulong)i) }, $"arr.{i}");
+            _builder.BuildStore(v, slot);
+            if (refHeap is { } rh) { EmitRetain(v, rh); ReleaseTemp(node.Elements[i], v); }   // array co-owns ref elements
+        }
+        return obj;
+    }
+
+    public LLVMValueRef VisitIndex(IndexExpr node)
+    {
+        var arr = node.Target.Accept(this);
+        var idx = node.Index.Accept(this);
+        if (ClassHeapOf(node.Target) is not { } headerType || !_arrayElem.TryGetValue(headerType.StructName, out var info))
+            throw new NotSupportedException($"index target is not a known array: {node.Target}");
+        var data = _builder.BuildInBoundsGEP2(_ctx.Int8Type, arr, new[] { LLVMValueRef.CreateConstInt(_ctx.Int64Type, 16) }, "arr.data");
+        var slot = _builder.BuildInBoundsGEP2(info.Elem, data, new[] { idx }, "arr.elem");
+        return _builder.BuildLoad2(info.Elem, slot, "elem");
     }
 
     // String arguments passed to a `cstr` parameter are coerced to their data pointer (for FFI).
@@ -1480,8 +1583,16 @@ public class AstVisitor : IAstVisitor<LLVMValueRef>
         NamedType n => AstHelpers.MapPrimitiveType(_ctx, n.Name),
         DynType d => GetDynType(d.InterfaceName),
         GenericType g => ResolveGenericType(g),                                     // Box<int32> -> %Box$i32
+        ArrayType a => ResolveArrayType(a),                                         // T[] -> reference (ptr), instantiate %Array$T
         _ => throw new NotSupportedException($"type {type} not supported yet")
     };
+
+    private LLVMTypeRef ResolveArrayType(ArrayType a)
+    {
+        var (elem, refHeap) = ResolveElement(a.Element);
+        InstantiateArray(elem, refHeap);
+        return LLVMTypeRef.CreatePointer(_ctx.Int8Type, 0);   // an array is a reference
+    }
 
     // Resolve an explicit generic application (`Box<int32>`, or `Box<T>` under an active env)
     // to its instantiated LLVM struct type.

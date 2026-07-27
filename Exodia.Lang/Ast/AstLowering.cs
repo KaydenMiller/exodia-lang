@@ -10,14 +10,15 @@ public class AstLowering
     
     internal static TypeRef LowerType(ExodiaParser.TypeContext context)
     {
-        if (context.DYN() is not null)
-            return new DynType(context.qualified_name().GetText(), Span(context));
-        if (context.type_arguments() is { } targs)
-            return new GenericType(
-                context.qualified_name().GetText(),
-                targs.type().Select(LowerType).ToList(),
-                Span(context));
-        return new NamedType(context.qualified_name().GetText(), Span(context));
+        TypeRef baseType =
+            context.DYN() is not null ? new DynType(context.qualified_name().GetText(), Span(context))
+            : context.type_arguments() is { } targs ? new GenericType(context.qualified_name().GetText(), targs.type().Select(LowerType).ToList(), Span(context))
+            : new NamedType(context.qualified_name().GetText(), Span(context));
+        // wrap once per `[]` suffix (direct '[' children, not the ones inside type_arguments): T[] , T[][]
+        var depth = context.children?.Count(c => c is Antlr4.Runtime.Tree.ITerminalNode { } t && t.GetText() == "[") ?? 0;
+        for (var i = 0; i < depth; i++)
+            baseType = new ArrayType(baseType, Span(context));
+        return baseType;
     }
 
     internal static TextSpan Span(ParserRuleContext context)
@@ -542,8 +543,15 @@ public class ExpressionLowering : ExodiaBaseVisitor<Expr>
         if (ops.Length == 2 && ops[0].identifier() is { } methodId && ops[1].arguments() is { } methodArgs)
             return new MethodCall(Visit(context.primary_expression()), methodId.GetText(), LowerArgs(methodArgs), AstLowering.Span(context));
 
+        // a[i] -- index
+        if (ops.Length == 1 && ops[0].expression() is { } idx)
+            return new IndexExpr(Visit(context.primary_expression()), Visit(idx), AstLowering.Span(context));
+
         throw new NotSupportedException($"postfix form not lowered yet: {context.GetText()}");
     }
+
+    public override Expr VisitArray_literal(ExodiaParser.Array_literalContext context)
+        => new ArrayLiteral(context.expression().Select(Visit).ToList(), AstLowering.Span(context));
 
     private List<Expr> LowerArgs(ExodiaParser.ArgumentsContext arguments)
         => ExodiaHelpers.CollectArgs(arguments.argument_list())
